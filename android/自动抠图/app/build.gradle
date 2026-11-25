@@ -1,0 +1,50 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.zqmxm.autocut'
+    compileSdk 34
+
+    defaultConfig {
+        // applicationId 是 Android 系统强制要求的英文应用身份证，属于工具链标识，
+        // 所以保留英文；软件本名体现在目录、README、APK 文件名和 workflow 名上。
+        applicationId 'com.zqmxm.autocut'
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName '1.0'
+    }
+
+    // 命名铁律：打出来的安装包必须叫「自动抠图.apk」，不许叫 app-debug.apk。
+    // 外面包一层 try 是为了兼容将来 AGP 移除旧版 Variant API 的情况：
+    // 万一这里失效，流水线里的「统一产物名为软件本名」步骤仍会兜底改名，不会让构建失败。
+    try {
+        applicationVariants.all { variant ->
+            variant.outputs.all { output ->
+                output.outputFileName = '自动抠图.apk'
+            }
+        }
+    } catch (Throwable ignored) {
+        logger.warn('当前 AGP 不支持旧版 applicationVariants，产物名由流水线统一处理')
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            // 签名配置故意不写死：Release 签名需要你自己的 keystore，
+            // 通过本地 local.properties 或环境变量提供，绝不提交进仓库。
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+// 零第三方依赖：只用 Android SDK 自带的类，保证 GitHub Actions 在任何环境都能编过。

@@ -1,8 +1,18 @@
-# android/ · 最小 Android 原生工程
+# android/ · 安卓手机软件目录
 
-一个能真正打出 **APK** 的零第三方依赖工程，纯 Java、无布局 XML、无 Compose，专门为了让任何环境都能编过。
+这个文件夹装**安卓手机软件**（APK 安装包）。里面现在有两个互不干扰的工程：
 
-## 怎么拿到 APK（最简单）
+| 子目录 / 文件 | 是什么 | 怎么出包 |
+| --- | --- | --- |
+| 根上的 `app/`、`build.gradle`、`settings.gradle` | 最小 Android 原生模板，零第三方依赖，纯 Java | `android.yml` → `app-debug.apk` |
+| `自动抠图/` | 一键抠图 App：选照片自动去背景、存透明 PNG | `自动抠图.yml` → `自动抠图.apk` |
+
+> 两个工程各走各的流水线：改 `自动抠图/` 只跑「自动抠图」，原来的最小模板继续用 `android.yml`。
+> 「自动抠图」的说明书在 `android/自动抠图/README.md`，找它先看那一份。
+>
+> 下面这几节讲的是**最小模板**，不是自动抠图。
+
+## 最小模板：怎么拿到 APK（最简单）
 
 1. push 代码 → 仓库 **Actions** → `Android APK` 流水线
 2. 跑完后在该次运行底部下载 Artifact `omni-android-debug-apk`

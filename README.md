@@ -28,7 +28,7 @@ cd omni-repo
 | `python/` | Python 脚本、CLI、数据处理、桌面程序源码 | ✅ 示例 + unittest |
 | `web/` | 静态网页、单页小工具（零依赖，双击即开） | ✅ 带首页 |
 | `node/` | Node 服务、前端工程、构建脚本 | ✅ `node index.js` 可跑 |
-| `android/` | **Android 原生工程，CI 自动出 APK** | ✅ 最小 Gradle 工程 |
+| `android/` | **Android 原生工程，CI 自动出 APK** | ✅ 最小 Gradle 工程 + 自动抠图（一键抠图 App） |
 | `desktop/` | Windows exe / 桌面应用源码与打包说明 | ✅ 说明 + 打包配方 + 透明橡皮擦工具 |
 | `scripts/` | 通用脚手架 + 备份工具 | ✅ `new_project.py` / `omni.py` / `mcp_server.py` |
 | `data/` | 样例数据、配置、素材 | 占位，按需放 |
@@ -67,7 +67,8 @@ python scripts/omni.py download --tag <tag>                 # 下载任意版本
 | workflow | 触发 | 产出 |
 | --- | --- | --- |
 | `ci.yml` | 每次 push | Python 单测 / Node 冒烟 / Web 检查 / 脚手架自检 |
-| `android.yml` | `android/**` 改动或手动 | `app-debug.apk` artifact |
+| `android.yml` | `android/**` 改动或手动 | `app-debug.apk` artifact（最小模板） |
+| `自动抠图.yml` | `android/自动抠图/**` 改动或手动 | 算法自检 + `自动抠图.apk` artifact |
 | `透明橡皮擦.yml` | 透明橡皮擦改动或手动 | 透明橡皮擦.exe artifact |
 | `auto-backup.yml` | 清单/源码改动或手动 | **自动构建 + 独立 Release 备份（不覆盖）** |
 

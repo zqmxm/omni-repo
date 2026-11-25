@@ -15,6 +15,14 @@
       "kind": "python-exe",
       "artifact": "透明橡皮擦.exe",
       "runner": "windows-latest"
+    },
+    {
+      "name": "自动抠图",
+      "dir": "android/自动抠图",
+      "kind": "android",
+      "artifact": "自动抠图.apk",
+      "runner": "ubuntu-latest",
+      "ascii_name": "zidongkoutu"
     }
   ]
 }

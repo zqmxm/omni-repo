@@ -73,6 +73,8 @@ jobs:
       - name: 构建 Android APK
         if: matrix.app.kind == 'android'
         uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: "8.7"
 
       - name: 编译 APK
         if: matrix.app.kind == 'android'
@@ -80,6 +82,18 @@ jobs:
         run: |
           java -version
           gradle assembleDebug --no-daemon --stacktrace
+
+      # 双保险：不论 Gradle 怎么命名输出，统一改成清单里写的软件本名
+      - name: 统一 APK 产物名
+        if: matrix.app.kind == 'android'
+        shell: bash
+        run: |
+          TARGET="${{ matrix.app.artifact }}"
+          find "${{ matrix.app.dir }}/app/build/outputs/apk/debug" -name '*.apk' | while read -r f; do
+            if [ "$(basename "$f")" != "$TARGET" ]; then
+              mv -- "$f" "$(dirname "$f")/$TARGET"
+            fi
+          done
 
       - name: 定位产物
         id: artifact

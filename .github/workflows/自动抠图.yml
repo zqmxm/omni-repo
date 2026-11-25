@@ -1,0 +1,82 @@
+name: 自动抠图
+
+on:
+  push:
+    paths:
+      - "android/自动抠图/**"
+      - ".github/workflows/自动抠图.yml"
+  pull_request:
+    paths:
+      - "android/自动抠图/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: 构建自动抠图 APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # 算法自检不依赖 Android SDK，装好 JDK 就能跑；失败直接让流水线变红
+      - name: 抠图算法自检（零依赖）
+        working-directory: android/自动抠图
+        run: |
+          rm -rf build/自检 && mkdir -p build/自检
+          javac -encoding UTF-8 -d build/自检 \
+            app/src/main/java/com/zqmxm/autocut/CutCore.java \
+            自检/CutCoreSelfTest.java
+          java -cp build/自检 com.zqmxm.autocut.CutCoreSelfTest
+
+      - name: 确认 Android SDK
+        run: |
+          echo "ANDROID_HOME=${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          ls "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/platforms" 2>/dev/null | head -10 || true
+
+      - name: Gradle 8.7
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: "8.7"
+
+      - name: 编译 APK
+        working-directory: android/自动抠图
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      # 双保险：万一将来 AGP 改了输出命名规则，这里也统一成软件本名
+      - name: 统一产物名为软件本名
+        working-directory: android/自动抠图/app/build/outputs/apk/debug
+        run: |
+          for f in *.apk; do
+            if [ "$f" != "自动抠图.apk" ]; then mv -- "$f" "自动抠图.apk"; fi
+          done
+          ls -l
+
+      - name: 校验 APK 有效性
+        run: |
+          python3 - <<'PY'
+          import glob, os, zipfile
+          files = glob.glob('android/自动抠图/app/build/outputs/apk/debug/*.apk')
+          assert len(files) == 1, f'期望 1 个 APK，实际 {files}'
+          p = files[0]
+          assert os.path.basename(p) == '自动抠图.apk', f'产物名必须用软件本名，实际 {p}'
+          with zipfile.ZipFile(p) as z:
+              names = z.namelist()
+          assert 'AndroidManifest.xml' in names, names[:20]
+          assert 'classes.dex' in names, names[:20]
+          print(f'APK OK: {p} ({os.path.getsize(p)} bytes), {len(names)} entries')
+          PY
+
+      - name: 上传 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: 自动抠图
+          path: android/自动抠图/app/build/outputs/apk/debug/自动抠图.apk
+          if-no-files-found: error
