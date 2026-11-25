@@ -314,20 +314,44 @@ def download_asset(token: str, tag: str, dest: Path, asset_name: str | None = No
     dest.mkdir(parents=True, exist_ok=True)
     target = dest / chosen["name"]
     url = f"{API}/repos/{owner}/{repo}/releases/assets/{chosen['id']}"
-    req = urllib.request.Request(url, headers={
-        "Authorization": "Bearer " + token,
-        "Accept": "application/octet-stream",
-        "User-Agent": "omni-repo-backup",
-    })
-    try:
-        with urllib.request.urlopen(req, timeout=180) as resp, open(target, "wb") as f:
-            while True:
-                chunk = resp.read(1024 * 1024)
-                if not chunk:
+    total = int(chosen.get("size", 0))
+    chunk_size = 2 * 1024 * 1024  # 每块 2MB，逐块请求避免单次超时
+
+    # 若已有部分文件，从已下载长度续传（断点续传）
+    start = target.stat().st_size if target.exists() else 0
+    if total and start >= total:
+        return target
+
+    mode = "ab" if start else "wb"
+    with open(target, mode) as f:
+        while True:
+            end = start + chunk_size - 1
+            if total:
+                end = min(end, total - 1)
+            req = urllib.request.Request(url, headers={
+                "Authorization": "Bearer " + token,
+                "Accept": "application/octet-stream",
+                "User-Agent": "omni-repo-backup",
+                "Range": f"bytes={start}-{end}",
+            })
+            try:
+                with urllib.request.urlopen(req, timeout=60) as resp:
+                    data = resp.read()
+            except urllib.error.HTTPError as exc:
+                if exc.code == 416:  # 请求范围超出，视为完成
                     break
-                f.write(chunk)
-    except urllib.error.HTTPError as exc:
-        raise OmniError(f"下载失败：HTTP {exc.code}") from exc
+                raise OmniError(f"下载失败：HTTP {exc.code}") from exc
+            except urllib.error.URLError as exc:
+                raise OmniError(f"下载中断（已保存 {f.tell()} 字节，可重跑续传）：{exc.reason}") from exc
+            if not data:
+                break
+            f.write(data)
+            f.flush()
+            start += len(data)
+            if total and start >= total:
+                break
+            if not total and len(data) < chunk_size:
+                break
     return target
 
 
