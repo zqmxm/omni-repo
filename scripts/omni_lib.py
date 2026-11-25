@@ -327,10 +327,11 @@ def upload_asset(token: str, upload_url: str, file_path: Path, display_name: str
 
 
 def make_source_zip(project: Path, out_dir: Path, app_name: str) -> Path:
-    """把软件项目目录打包成源码 zip（排除构建产物），返回 zip 路径。"""
+    """把软件项目目录打包成源码 zip（排除构建产物），返回 zip 路径。
+    本地文件名用中文（如「透明橡皮擦源码.zip」），上传到 GitHub 时才转 ASCII。"""
     import zipfile
     out_dir.mkdir(parents=True, exist_ok=True)
-    target = out_dir / f"{_ascii_name(app_name)}-source.zip"
+    target = out_dir / f"{app_name}源码.zip"
     skip_dirs = {"build", "dist", "__pycache__", ".git", "node_modules"}
     with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as zf:
         for root, dirs, files in os.walk(project):
@@ -368,9 +369,26 @@ def download_asset(token: str, tag: str, dest: Path, asset_name: str | None = No
         raise OmniError(f"Release {tag} 没有可下载资产")
     if asset_name:
         assets = [a for a in assets if a["name"] == asset_name] or assets
+    else:
+        # 默认优先选可执行文件（用户最常要的），其次才选源码包
+        exe_kinds = (".exe", ".apk", ".msi", ".dmg", ".appimage")
+        exes = [a for a in assets if a["name"].lower().endswith(exe_kinds)]
+        if exes:
+            assets = exes
     chosen = assets[0]
     dest.mkdir(parents=True, exist_ok=True)
-    target = dest / chosen["name"]
+    # 下载到本地用中文名：优先用中文显示名(label) + Release 版本，
+    # 让用户保存下来的文件一眼就知道是什么。GitHub 上存的 ASCII 名不暴露给用户。
+    m = re.search(r"-v(\d+\.\d+\.\d+)", tag)
+    ver = m.group(1) if m else ""
+    label = chosen.get("label") or ""
+    suffix = Path(chosen["name"]).suffix or ""
+    if label:
+        version_part = f"v{ver}" if ver else ""
+        local_name = f"{label} {version_part}{suffix}".strip()
+    else:
+        local_name = chosen["name"]
+    target = dest / local_name
     url = f"{API}/repos/{owner}/{repo}/releases/assets/{chosen['id']}"
     total = int(chosen.get("size", 0))
     chunk_size = 2 * 1024 * 1024  # 每块 2MB，逐块请求避免单次超时

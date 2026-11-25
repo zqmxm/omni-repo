@@ -24,7 +24,8 @@ TEMPLATES = {
     "android": "android",
     "desktop": "desktop",
 }
-NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+# 软件名用本名（中文即可），只排除空白与系统/路径保留字符
+NAME_RE = re.compile(r"^[^\s/\\~^:?*\[\]@{}][^\s/\\~^:?*\[\]@{}]{0,63}$")
 SKIP_PARTS = {"__pycache__", "node_modules", ".git", "build", "dist", ".gradle"}
 SKIP_SUFFIXES = {".pyc", ".apk", ".exe", ".jks", ".keystore"}
 
@@ -50,9 +51,21 @@ def render_readme(name: str, template: str, has_original: bool) -> str:
         "",
         f"由 `{template}` 模板生成，按需修改。",
         "",
+        "## 这个软件是干什么的",
+        "",
+        "（用大白话写清楚：它能帮用户做什么）",
+        "",
+        "## 每个文件是什么",
+        "",
+        "（用中文列出来：哪个文件干什么，让所有者一眼看懂）",
+        "",
+        "## 生成的文件在哪里",
+        "",
+        "（写清楚成品在哪个文件夹、叫什么名字、怎么打开）",
+        "",
         "## 运行",
         "",
-        "（在这里写清楚：怎么跑、依赖、怎么测试、怎么出包）",
+        "（写清楚：怎么跑、依赖、怎么测试、怎么出包）",
         "",
     ]
     if has_original:
@@ -68,7 +81,7 @@ def render_readme(name: str, template: str, has_original: bool) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="生成一个新项目骨架")
-    ap.add_argument("--name", required=True, help="项目目录名")
+    ap.add_argument("--name", required=True, help="软件本名（中文软件就传中文，目录用它命名）")
     ap.add_argument("--template", choices=[*TEMPLATES, "blank"], default="blank")
     ap.add_argument("--force", action="store_true", help="目录已存在时覆盖")
     args = ap.parse_args()
