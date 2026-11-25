@@ -10,5 +10,6 @@
 - 不提交密钥、keystore、*.exe、*.apk、node_modules、build 产物
 - 不引入绑定特定 AI 平台的私有依赖
 - 新增 workflow 要带路径过滤 + `workflow_dispatch`
+- **做完软件必须备份**：`python scripts/omni.py publish --name <名> --artifact <产物>`，每个版本独立 Release 不覆盖旧版本，详见 `BACKUP_GUIDE.md`
 
-交付时说明改了哪些文件、怎么运行、怎么测试、产物在哪、有什么边界。
+交付时说明改了哪些文件、怎么运行、怎么测试、Release 备份链接在哪、有什么边界。

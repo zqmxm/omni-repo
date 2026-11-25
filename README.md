@@ -30,23 +30,44 @@ cd omni-repo
 | `node/` | Node 服务、前端工程、构建脚本 | ✅ `node index.js` 可跑 |
 | `android/` | **Android 原生工程，CI 自动出 APK** | ✅ 最小 Gradle 工程 |
 | `desktop/` | Windows exe / 桌面应用源码与打包说明 | ✅ 说明 + 打包配方 + 透明橡皮擦工具 |
-| `scripts/` | 通用脚手架、辅助脚本 | ✅ `new_project.py` |
+| `scripts/` | 通用脚手架 + 备份工具 | ✅ `new_project.py` / `omni.py` / `mcp_server.py` |
 | `data/` | 样例数据、配置、素材 | 占位，按需放 |
 | `go/` `rust/` `java/` `flutter/` `miniapp/` | 其他语言 / 端 | 按需新建，规则见 AGENTS.md |
+| `BACKUP_GUIDE.md` | **自动备份系统规范** | ✅ 版本化 / 不覆盖 / 对话内上传下载 |
+| `build-manifest.json` | **自动构建备份清单** | ✅ 加一行即自动出包备份 |
 
 **唯一铁律**：一个软件一个子目录，目录里必须自带 `README.md` 写清「怎么跑」。互不干扰，CI 按改动路径分别检查。
 
 ---
 
-## 三条流水线
+## 备份系统：每个软件都存到 GitHub，永不覆盖
+
+这是本仓库的核心能力，详见 [BACKUP_GUIDE.md](BACKUP_GUIDE.md)。
+
+```bash
+python scripts/omni.py auth --token <你的PAT>              # 只配一次，存在本机
+python scripts/omni.py publish --name <软件名> --artifact <exe/apk路径>   # 备份源码+产物
+python scripts/omni.py list                                 # 列出所有历史版本
+python scripts/omni.py download --tag <tag>                 # 下载任意版本的 exe
+```
+
+- **源码**进仓库目录（新 commit + VERSION 递增），**产物**进独立 Release（不受 100MB 限制）
+- 每做一个新版本就**新增一个 Release**，旧版本永久保留，绝不覆盖
+- 支持 MCP 的 AI 注册 `scripts/mcp_server.py` 后，可**在对话框里直接上传/下载 exe**，不用打开 GitHub（配置见 `mcp-config.example.json`）
+- CI 构建的产物：在 `build-manifest.json` 加一行，`auto-backup.yml` 自动打包并备份
+
+---
+
+## 流水线
 
 | workflow | 触发 | 产出 |
 | --- | --- | --- |
-| `ci.yml` | 每次 push | Python 单测 / Node 冒烟 / Web 检查 / 六种脚手架模板自检 |
-| `android.yml` | `android/**` 改动或手动 | **`app-debug.apk` 可下载产物**（含合法性校验） |
-| `desktop/` 里的配方 | 按需复制 | Windows exe，参考 PyInstaller |
+| `ci.yml` | 每次 push | Python 单测 / Node 冒烟 / Web 检查 / 脚手架自检 |
+| `android.yml` | `android/**` 改动或手动 | `app-debug.apk` artifact |
+| `transparent-eraser.yml` | 透明橡皮擦改动或手动 | exe artifact |
+| `auto-backup.yml` | 清单/源码改动或手动 | **自动构建 + 独立 Release 备份（不覆盖）** |
 
-APK 你在网页上就能拿：仓库 → **Actions** → `Android APK` → 底部 Artifacts → `omni-android-debug-apk`，下载后传到手机安装（需允许「未知来源」）。
+产物在仓库 → **Actions** → 对应工作流 → Artifacts，或 **Releases** 页签直接下载。
 
 ---
 

@@ -53,6 +53,28 @@
 
 `omni-repo.zip` 解压后就是完整仓库（不含 `.git`）。把它拖进任何支持「上传文件夹 / 本地工作区」的 AI 工具，指向 `AGENTS.md`，即可开始。不需要原对话、不需要 GitHub 账号、不需要联网（构建 APK / exe 时才需要对应 SDK 和 CI）。
 
+## 自动备份：做完软件直接存到 GitHub
+
+本仓库已内置备份系统，任何 AI 做完软件后都能把源码和 exe/apk 存到 GitHub，**每个版本独立保留、永不覆盖旧版本**。详见 `BACKUP_GUIDE.md`。
+
+**一次配置**（任何 AI 帮你做，或你自己跑一次）：
+```bash
+python scripts/omni.py auth --token <你的GitHub_PAT>
+```
+Token 只存本机 `~/.omni-repo/config.json`（仓库外，不入库），以后不用再登录 GitHub 网页。
+
+**每次交付只需一条命令**：
+```bash
+python scripts/omni.py publish --name <软件名> --artifact <产物路径>
+python scripts/omni.py list                    # 看所有历史版本
+python scripts/omni.py download --tag <tag>    # 下载某个版本的 exe
+```
+
+**在 AI 对话框里直接上传/下载**（无需打开 GitHub）：
+把 `scripts/mcp_server.py` 注册为 MCP 工具（配置模板见 `mcp-config.example.json`），AI 就能直接调用 `omni_publish` / `omni_list` / `omni_download`。支持 MCP 的 Cursor、Claude Desktop、WorkBuddy 等都可用。
+
+**CI 自动备份**：产物由 GitHub Actions 构建时，在 `build-manifest.json` 加一条配置，`auto-backup.yml` 会自动打包并创建独立 Release，连命令都不用敲。
+
 ## 换 AI 时不会丢的东西
 
 - 目录约定与命名规则
@@ -60,6 +82,7 @@
 - CI 触发与产物路径
 - 禁止提交清单与合规边界
 - 「一个项目一个 README」的习惯
+- **备份规范与版本历史（全部在 GitHub，跨 AI 可见）**
 
 **会丢的只有对话记忆**——所以规范才全部写进仓库，而不是留在聊天里。
 

@@ -1,0 +1,132 @@
+name: Auto Backup (通用自动备份)
+
+# 任何 AI 新增软件后，只需在 build-manifest.json 里加一条配置，
+# 本工作流会自动构建 exe/apk 并创建 Release，永不覆盖旧版本。
+# 也可在 Actions 页面手动触发并选择软件。
+
+on:
+  push:
+    paths:
+      - "build-manifest.json"
+      - "desktop/**"
+      - "android/**"
+      - ".github/workflows/auto-backup.yml"
+      - "scripts/build_all.py"
+  workflow_dispatch:
+    inputs:
+      app:
+        description: "要备份的软件名（留空 = 备份清单里全部）"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    name: 读取构建清单
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.read.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: 解析 build-manifest.json
+        id: read
+        run: |
+          python3 - <<'PY'
+          import json, os
+          manifest = json.load(open('build-manifest.json', encoding='utf-8'))
+          apps = manifest.get('apps', [])
+          target = "${{ inputs.app }}".strip()
+          if target:
+              apps = [a for a in apps if a['name'] == target]
+              if not apps:
+                  raise SystemExit(f'清单中找不到: {target}')
+          print('matrix=' + json.dumps({'include': apps}, ensure_ascii=False))
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
+              f.write('matrix=' + json.dumps({'include': apps}, ensure_ascii=False) + '\n')
+          PY
+
+  build:
+    name: 构建并备份 ${{ matrix.app.name }}
+    needs: prepare
+    if: ${{ needs.prepare.outputs.matrix != '{"include":[]}' }}
+    runs-on: ${{ matrix.app.runner || 'windows-latest' }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 安装依赖
+        if: matrix.app.kind == 'python-exe'
+        run: pip install -r "${{ matrix.app.dir }}/requirements.txt" "pyinstaller>=6,<7"
+
+      - name: 构建 Windows exe
+        if: matrix.app.kind == 'python-exe'
+        run: python "${{ matrix.app.dir }}/build.py"
+
+      - name: 构建 Android APK
+        if: matrix.app.kind == 'android'
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: 编译 APK
+        if: matrix.app.kind == 'android'
+        working-directory: ${{ matrix.app.dir }}
+        run: |
+          java -version
+          gradle assembleDebug --no-daemon --stacktrace
+
+      - name: 定位产物
+        id: artifact
+        shell: bash
+        run: |
+          PATTERN="${{ matrix.app.artifact }}"
+          FILE=$(find "${{ matrix.app.dir }}" -type f -name "$(basename "$PATTERN")" | head -1)
+          if [ -z "$FILE" ]; then
+            echo "未找到产物：$PATTERN"; exit 1
+          fi
+          echo "找到产物：$FILE"
+          echo "path=$FILE" >> "$GITHUB_OUTPUT"
+
+      - name: 读取并递增版本
+        id: ver
+        shell: bash
+        run: |
+          VF="${{ matrix.app.dir }}/VERSION"
+          CUR=$(cat "$VF" 2>/dev/null || echo "0.0.0")
+          MAJOR=$(echo "$CUR" | cut -d. -f1)
+          MINOR=$(echo "$CUR" | cut -d. -f2)
+          PATCH=$(echo "$CUR" | cut -d. -f3)
+          NEXT="$MAJOR.$MINOR.$((PATCH+1))"
+          echo "$NEXT" > "$VF"
+          echo "version=$NEXT" >> "$GITHUB_OUTPUT"
+          STAMP=$(date +%Y%m%d-%H%M)
+          echo "tag=${{ matrix.app.name }}-v${NEXT}-${STAMP}" >> "$GITHUB_OUTPUT"
+
+      - name: 创建 Release 并上传产物（新增，不覆盖）
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: ${{ matrix.app.name }} v${{ steps.ver.outputs.version }}
+          body: |
+            ## ${{ matrix.app.name }} v${{ steps.ver.outputs.version }}
+
+            - 由 GitHub Actions 自动构建并备份
+            - 每次构建生成独立 Release，旧版本不会被覆盖
+            - 源码随本次 commit 一同保留在仓库
+          files: ${{ steps.artifact.outputs.path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 提交版本号更新
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "${{ matrix.app.dir }}/VERSION"
+          git commit -m "chore(${{ matrix.app.name }}): 版本更新至 v${{ steps.ver.outputs.version }}" || echo "无变更"
+          git push || echo "推送失败（无人值守时可忽略）"

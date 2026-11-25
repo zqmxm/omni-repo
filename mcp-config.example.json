@@ -1,0 +1,12 @@
+{
+  "_说明": "把下面 mcpServers.omni-repo 这段复制到你的 AI 工具 MCP 配置里；把 <仓库绝对路径> 换成实际路径，<你的PAT> 换成 GitHub Token（也可省略 env，改用本机 ~/.omni-repo/config.json）。",
+  "mcpServers": {
+    "omni-repo": {
+      "command": "python",
+      "args": ["<仓库绝对路径>/scripts/mcp_server.py"],
+      "env": {
+        "GITHUB_TOKEN": "<你的PAT>"
+      }
+    }
+  }
+}

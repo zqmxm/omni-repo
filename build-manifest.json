@@ -1,0 +1,19 @@
+{
+  "_说明": "新软件只需在这里加一条，auto-backup.yml 就会自动构建并备份到独立 Release",
+  "_字段": {
+    "name": "软件名（英文小写/连字符）",
+    "dir": "项目目录（相对仓库根）",
+    "kind": "python-exe | android | node | web",
+    "artifact": "产物文件名或相对路径",
+    "runner": "可选，windows-latest 或 ubuntu-latest"
+  },
+  "apps": [
+    {
+      "name": "transparent-eraser",
+      "dir": "desktop/transparent-eraser",
+      "kind": "python-exe",
+      "artifact": "TransparentEraser.exe",
+      "runner": "windows-latest"
+    }
+  ]
+}

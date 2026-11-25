@@ -33,32 +33,46 @@
 - Windows exe：PyInstaller 6.x，构建放到 `windows-latest` runner
 - 注释和文档默认**中文**（与仓库所有者语言一致）
 
-## 5. 绝对不要做的事
+## 5. 交付必做：备份到 GitHub（不覆盖旧版本）
 
-- ❌ 提交 `.env`、keystore、token、密码、私钥、账号 cookie
+**每个软件做完并产出可执行文件后，必须备份。** 这是本仓库的核心能力，详见 `BACKUP_GUIDE.md`。
+
+- 一条命令完成源码 + 产物备份：
+  `python scripts/omni.py publish --name <软件名> --artifact <产物路径>`
+- 每个版本生成**独立的 Release**，tag 带版本号和时间戳，**永不覆盖旧版本**
+- 源码走仓库目录（每次新 commit + VERSION 文件递增），产物 exe/apk 走 Release（不入库，避开 100MB 限制）
+- 若产物由 CI 构建：在 `build-manifest.json` 加一条配置，`auto-backup.yml` 会自动构建并备份，无需手工上传
+- 用户无需登录 GitHub 网页：Token 一次配置（`python scripts/omni.py auth --token <PAT>`）后存在本机仓库外
+- 支持 MCP 的 AI：注册 `scripts/mcp_server.py` 后可在对话框直接调用 `omni_publish` / `omni_list` / `omni_download`
+
+## 6. 绝对不要做的事
+
+- ❌ 提交 `.env`、keystore、token、密码、私钥、账号 cookie、`.omni-repo/config.json`
 - ❌ 提交 `*.exe` `*.apk` `*.zip` `node_modules/` `build/` `dist/` 等构建产物（用 Release / Artifact 分发）
 - ❌ 引入需要付费账号、私有 API、特定 AI 平台插件才能运行的依赖
 - ❌ 修改或删除别的项目目录里的内容
 - ❌ 写「能破解/绕过/移除他人版权保护」的功能
-- ❌ 在 CI 里回写仓库、自动提交生成物
+- ❌ 覆盖已有版本的 Release 或产物——永远新增版本
 
-## 6. CI 约定
+## 7. CI 约定
 
 - `ci.yml`：每次 push 跑 Python 单测 / Node 冒烟 / Web 存在性，必须保持绿
 - `android.yml`：仅 `android/**` 或自身改动时触发，产出 `app-debug.apk` artifact
+- `auto-backup.yml`：读 `build-manifest.json`，自动构建 exe/apk 并创建独立 Release（不覆盖）
 - 新增 workflow 一律加 `workflow_dispatch:` 方便手动重跑
 - 构建失败时如实报告，不要假装成功；本机跑不了的工具链（Android SDK / Windows）交给 CI
 
-## 7. 交付给用户的回复模板
+## 8. 交付给用户的回复模板
 
 ```
 已写到 <目录>/，新增 <N> 个文件。
 运行：<命令>
 测试：<命令 / CI 链接>
-产物：<Artifact 或本地文件路径>
+产物：<Release 链接 / Artifact / 本地路径>
+备份：python scripts/omni.py publish ... （或已由 CI 自动备份）
 边界：<做不到或需要额外环境的地方>
 ```
 
-## 8. 权限与合规
+## 9. 权限与合规
 
 仓库归所有者所有，你只是代为写代码。所有生成内容按 MIT 许可。不要声称仓库绑定了某个 AI 服务；用户换任何 AI 打开本仓库，读本文件即可继续工作。
