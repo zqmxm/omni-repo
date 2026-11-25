@@ -281,16 +281,66 @@ def create_release(token: str, tag: str, name: str, body: str) -> dict:
     return data
 
 
-def upload_asset(token: str, upload_url: str, file_path: Path, label: str) -> dict:
+def _ascii_name(name: str) -> str:
+    """软件本名 -> ASCII 文件名。GitHub 上传接口会剥离中文 name，
+    故实际文件名用拼音/ASCII，显示名用中文 label。内置常见名映射，
+    其他名字用 'app' 兜底（AI 可在 build-manifest 里加 "ascii_name" 覆盖）。"""
+    builtin = {
+        "透明橡皮擦": "toumingxiangpicao",
+    }
+    if name in builtin:
+        return builtin[name]
+    if name.isascii():
+        return name
+    # 尝试从 build-manifest.json 读 ascii_name
+    try:
+        mf = json.loads((ROOT / "build-manifest.json").read_text(encoding="utf-8"))
+        for app in mf.get("apps", []):
+            if app.get("name") == name and app.get("ascii_name"):
+                return app["ascii_name"]
+    except (OSError, json.JSONDecodeError):
+        pass
+    return "app"
+
+
+def upload_asset(token: str, upload_url: str, file_path: Path, display_name: str,
+                 file_name: str | None = None) -> dict:
+    """上传资产：文件名用 ASCII（GitHub 限制），显示名 label 用中文软件本名。"""
     if not file_path.is_file():
         raise OmniError(f"产物文件不存在：{file_path}")
-    asset_name = f"{label}{file_path.suffix}"
-    url = upload_url.split("{")[0] + "?name=" + urllib.parse.quote(asset_name)
+    name = file_name or file_path.name
+    if not name.isascii():
+        name = _ascii_name(display_name) + file_path.suffix
+    url = upload_url.split("{")[0] + "?name=" + urllib.parse.quote(name)
     data, _ = api(
         "POST", "", token, raw=file_path.read_bytes(),
         host=url, content_type="application/octet-stream",
     )
+    # 设置中文显示名（label 字段保留中文，GitHub 界面优先显示）
+    asset_id = data["id"]
+    owner, repo = get_repo()
+    api("PATCH", f"/repos/{owner}/{repo}/releases/assets/{asset_id}", token, data={
+        "label": display_name,
+    })
+    data["label"] = display_name
     return data
+
+
+def make_source_zip(project: Path, out_dir: Path, app_name: str) -> Path:
+    """把软件项目目录打包成源码 zip（排除构建产物），返回 zip 路径。"""
+    import zipfile
+    out_dir.mkdir(parents=True, exist_ok=True)
+    target = out_dir / f"{_ascii_name(app_name)}-source.zip"
+    skip_dirs = {"build", "dist", "__pycache__", ".git", "node_modules"}
+    with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as zf:
+        for root, dirs, files in os.walk(project):
+            dirs[:] = [d for d in dirs if d not in skip_dirs]
+            for fn in files:
+                if fn.endswith((".pyc", ".exe", ".spec")):
+                    continue
+                full = Path(root) / fn
+                zf.write(full, full.relative_to(project))
+    return target
 
 
 def list_releases(token: str, name: str | None = None) -> list[dict]:
@@ -373,7 +423,7 @@ def publish(token: str, name: str, artifact: Path, bump: str = "patch",
 
     stamp = timestamp_tag()
     tag = f"{name}-v{new_version}-{stamp}"
-    label = f"{name}-v{new_version}-{platform_label(artifact)}"
+    ascii_name = _ascii_name(name)
 
     commit_sha = sync_source(token, f"backup({name}): v{new_version} 源码与构建脚本")
 
@@ -384,10 +434,26 @@ def publish(token: str, name: str, artifact: Path, bump: str = "patch",
         f"- 生成时间：{_dt.datetime.now().isoformat(timespec='seconds')}\n"
         f"- 任何 AI 产出的版本都会新增一个 Release，不会覆盖旧版本。\n",
     )
-    asset = upload_asset(token, release["upload_url"], artifact, label)
+
+    # 1) 可执行文件：文件名用 ASCII，显示名用软件本名
+    exe_file = f"{ascii_name}-v{new_version}-{platform_label(artifact)}{artifact.suffix}"
+    asset = upload_asset(token, release["upload_url"], artifact, name, exe_file)
+
+    # 2) 源码压缩包：显示名「<软件本名>源码」
+    source_label = f"{name}源码"
+    source_zip = make_source_zip(project, project / "dist", name)
+    try:
+        src_asset = upload_asset(
+            token, release["upload_url"], source_zip, source_label,
+            f"{ascii_name}-source-v{new_version}.zip",
+        )
+    except OmniError:
+        src_asset = None  # 源码包上传失败不影响主产物
+
     return {
         "name": name, "version": new_version, "tag": tag,
         "commit": commit_sha, "release_url": release["html_url"],
-        "asset": asset["name"], "asset_url": asset["browser_download_url"],
-        "size": asset["size"],
+        "asset": asset["name"], "asset_label": asset.get("label", name),
+        "asset_url": asset["browser_download_url"], "size": asset["size"],
+        "source_asset": src_asset["name"] if src_asset else None,
     }

@@ -23,9 +23,24 @@
 - **README 标题 = 软件本名**：项目 `README.md` 第一行 `# <软件本名>`。
 - **exe / apk / 安装包文件名 = 软件本名**：例如 `透明橡皮擦.exe`、`图片批量压缩器.apk`。
   PyInstaller 用 `--name <软件本名>`，gradle `archivesBaseName` 也用软件本名。
-  - 平台边界：GitHub Release **附件**（asset）的文件名经 API 上传时会被剥离中文字符，
-    因此 Release 里的资产文件名改用**软件本名的完整拼音**（如 `toumingxiangpicao-v1.0.0-windows-x64.exe`）。
-    但 Release **标题**、**tag**、**仓库目录**、**本地产物文件**全部用中文软件本名。
+
+### ⭐ 交付给用户的三类资产，显示名必须带软件本名
+
+每个软件的 Release 里都要有这三类资产，**用户在 GitHub 页面上看到的显示名必须用中文软件本名**：
+
+| 资产 | 显示名（label，中文） | 实际文件名（ASCII，GitHub 限制） |
+| --- | --- | --- |
+| 可执行文件 | `透明橡皮擦` | `toumingxiangpicao-v<版本>-windows-x64.exe` |
+| 源码压缩包 | `透明橡皮擦源码` | `toumingxiangpicao-source-v<版本>.zip` |
+| 源码包（可选） | `透明橡皮擦源码` | `toumingxiangpicao-source-v<版本>.tar.gz` |
+
+- **实现方式**：上传时用 `?name=<拼音文件名>`（GitHub 会剥离中文 name），上传成功后立刻
+  `PATCH /releases/assets/<id>` 设置 `label` 为**中文软件本名**——GitHub 界面优先显示 label，
+  这样用户看到的就是「透明橡皮擦」「透明橡皮擦源码」。
+- 源码压缩包内容 = 该软件项目目录（排除 `build/` `dist/` `__pycache__` / `*.exe`）。
+- **GitHub 自动生成的 "Source code (zip)" / "Source code (tar.gz)" 是平台固定文字，无法改名**，
+  所以必须额外上传上面这种带中文显示名的源码包来满足命名要求。
+- Release **标题**、**tag**、**仓库目录**、**本地产物文件**同样全部用中文软件本名。
 - **Release tag / 名称 / 备份标识 = 软件本名**：`透明橡皮擦-v1.0.0-<时间戳>`，
   `omni.py publish --name 透明橡皮擦`，`build-manifest.json` 的 `name`/`dir`/`artifact` 全部用本名。
 - **workflow 文件名也用软件本名**：`desktop/透明橡皮擦/` 对应 `.github/workflows/透明橡皮擦.yml`。

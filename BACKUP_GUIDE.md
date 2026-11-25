@@ -26,8 +26,18 @@
 - `<name>` 一律是**软件本名**：软件叫什么就写什么，中文软件用中文名（如 `透明橡皮擦`），禁止用英文代号/拼音缩写/繁简变体代替。这条规则跨 AI、跨软件一律生效。
 - Release tag：`<name>-v<版本>-<YYYYMMDD-HHMM>`，例如 `透明橡皮擦-v1.0.1-20261126-0130`
 - 源码 tag：`src/<name>/v<版本>`
-- Asset 名：`<name 拼音>-v<版本>-<平台>.<扩展名>`，例如 `toumingxiangpicao-v1.0.1-windows-x64.exe`
-  - ⚠️ GitHub Release 附件的文件名经 API 上传时会剥离中文（实测中文被替换成 `.` 或删除），故资产文件名用软件本名的完整拼音；Release 标题与 tag 仍用中文本名。
+- 资产（用户页面上看到的显示名 label）全部带软件本名，脚本自动设置：
+
+| 资产 | 显示名 label | 实际文件名（ASCII，GitHub 限制） |
+| --- | --- | --- |
+| 可执行文件 | `透明橡皮擦` | `toumingxiangpicao-v1.0.1-windows-x64.exe` |
+| 源码压缩包 | `透明橡皮擦源码` | `toumingxiangpicao-source-v1.0.1.zip` |
+
+  - ⚠️ GitHub Release 附件的**文件名**经 API 上传会剥离中文（实测中文被替换成 `.` 或删除），
+    所以文件名用软件本名拼音；但 GitHub 界面优先显示 **label**，label 设为中文软件本名，
+    用户看到的就是「透明橡皮擦」「透明橡皮擦源码」。
+  - GitHub 自动生成的 "Source code (zip/tar.gz)" 是平台固定文字无法改名，故脚本额外上传带中文显示名的源码包。
+- `publish` 会自动完成：上传 exe（label=软件名）+ 上传源码 zip（label=软件名+源码）。
 - 项目目录、README 标题、exe/apk 文件名、workflow 文件名同样用软件本名，详见 `AGENTS.md` 的「命名铁律」。
 
 ---
