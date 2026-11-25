@@ -26,7 +26,8 @@
 - `<name>` 一律是**软件本名**：软件叫什么就写什么，中文软件用中文名（如 `透明橡皮擦`），禁止用英文代号/拼音缩写/繁简变体代替。这条规则跨 AI、跨软件一律生效。
 - Release tag：`<name>-v<版本>-<YYYYMMDD-HHMM>`，例如 `透明橡皮擦-v1.0.1-20261126-0130`
 - 源码 tag：`src/<name>/v<版本>`
-- Asset 名：`<name>-v<版本>-<平台>.<扩展名>`，例如 `透明橡皮擦-v1.0.1-windows-x64.exe`
+- Asset 名：`<name 拼音>-v<版本>-<平台>.<扩展名>`，例如 `toumingxiangpicao-v1.0.1-windows-x64.exe`
+  - ⚠️ GitHub Release 附件的文件名经 API 上传时会剥离中文（实测中文被替换成 `.` 或删除），故资产文件名用软件本名的完整拼音；Release 标题与 tag 仍用中文本名。
 - 项目目录、README 标题、exe/apk 文件名、workflow 文件名同样用软件本名，详见 `AGENTS.md` 的「命名铁律」。
 
 ---

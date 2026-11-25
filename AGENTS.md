@@ -23,6 +23,9 @@
 - **README 标题 = 软件本名**：项目 `README.md` 第一行 `# <软件本名>`。
 - **exe / apk / 安装包文件名 = 软件本名**：例如 `透明橡皮擦.exe`、`图片批量压缩器.apk`。
   PyInstaller 用 `--name <软件本名>`，gradle `archivesBaseName` 也用软件本名。
+  - 平台边界：GitHub Release **附件**（asset）的文件名经 API 上传时会被剥离中文字符，
+    因此 Release 里的资产文件名改用**软件本名的完整拼音**（如 `toumingxiangpicao-v1.0.0-windows-x64.exe`）。
+    但 Release **标题**、**tag**、**仓库目录**、**本地产物文件**全部用中文软件本名。
 - **Release tag / 名称 / 备份标识 = 软件本名**：`透明橡皮擦-v1.0.0-<时间戳>`，
   `omni.py publish --name 透明橡皮擦`，`build-manifest.json` 的 `name`/`dir`/`artifact` 全部用本名。
 - **workflow 文件名也用软件本名**：`desktop/透明橡皮擦/` 对应 `.github/workflows/透明橡皮擦.yml`。
