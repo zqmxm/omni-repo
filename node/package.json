@@ -1,0 +1,11 @@
+{
+  "name": "omni-repo-node-starter",
+  "version": "1.0.0",
+  "private": true,
+  "description": "通用仓库里的 Node 最小骨架",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node index.js"
+  },
+  "license": "MIT"
+}

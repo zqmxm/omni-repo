@@ -1,0 +1,65 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ---- Node ----
+node_modules/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.next/
+.nuxt/
+.vite/
+
+# ---- Android / Gradle ----
+.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/*.iml
+*.keystore
+*.jks
+!*.example.jks
+
+# ---- Java / Go / Rust ----
+target/
+*.class
+*.jar
+!android/gradle/wrapper/gradle-wrapper.jar
+bin/
+Cargo.lock.bak
+
+# ---- 构建产物 / 安装包（一律不入库，用 Release / Artifact 分发）----
+build/
+dist/
+*.exe
+*.msi
+*.dmg
+*.apk
+*.aab
+*.ipa
+*.zip
+*.tar.gz
+!*.whl
+
+# ---- 系统 / IDE ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# ---- 密钥 ----
+.env
+.env.*
+*.pem
+*.key
+secrets.*
+!secrets.example.*

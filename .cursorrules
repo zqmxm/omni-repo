@@ -1,0 +1,12 @@
+本仓库的唯一权威规则是根目录 AGENTS.md，动手前先读它，再读 AI_GUIDE.md。
+
+核心约定：
+- 一个软件一个子目录，每个项目目录必须自带 README.md 说明怎么跑
+- 新项目用 `python scripts/new_project.py --name <name> --template <python|web|node|android|desktop|blank>`
+- Python 3.10+ / Node 20 / Android: JDK17 + Gradle 8.7 + AGP 8.5.2 + compileSdk 34
+- UTF-8 + LF，文档用中文
+- 禁止提交 .env、keystore、token、*.exe、*.apk、node_modules、build 产物
+- 禁止引入绑定某个 AI 平台的私有依赖；本仓库必须能被任何 AI 接手
+- 新增 workflow 要带路径过滤和 workflow_dispatch
+
+交付时说明：改了哪些文件、怎么运行、怎么测试、产物在哪、有什么边界。

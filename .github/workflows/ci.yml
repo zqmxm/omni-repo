@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: Python 单元测试
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: cd python && python -m unittest discover -s tests -v
+
+  node:
+    name: Node 冒烟运行
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: cd node && node index.js
+
+  web:
+    name: Web 文件检查
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          test -f web/index.html
+          grep -q '<html' web/index.html
+          echo "web/index.html OK"
+
+  scaffold:
+    name: 脚手架自检
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: |
+          python scripts/new_project.py --name smoke-py --template python
+          python scripts/new_project.py --name smoke-web --template web
+          python scripts/new_project.py --name smoke-node --template node
+          python scripts/new_project.py --name smoke-android --template android
+          python scripts/new_project.py --name smoke-desktop --template desktop
+          python scripts/new_project.py --name smoke-blank
+          test -f smoke-android/app/build.gradle
+          test -f smoke-desktop/README.md
+          test -f smoke-blank/README.md
+          echo "全部模板生成 OK"

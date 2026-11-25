@@ -1,0 +1,35 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.zqmxm.omni'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.zqmxm.omni'
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName '1.0'
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            // 签名配置故意不写死：Release 签名 APK 需要你自己的 keystore，
+            // 通过本地 local.properties 或环境变量提供，绝不提交进仓库。
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+// 本示例只用 Android SDK 自带的类，无第三方依赖，保证任何环境都能编过。
