@@ -48,10 +48,10 @@ jobs:
           PY
 
   build:
-    name: 构建并备份 ${{ matrix.app.name }}
+    name: 构建并备份 ${{ matrix.name }}
     needs: prepare
     if: ${{ needs.prepare.outputs.matrix != '{"include":[]}' }}
-    runs-on: ${{ matrix.app.runner || 'windows-latest' }}
+    runs-on: ${{ matrix.runner || 'windows-latest' }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
@@ -62,34 +62,41 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: JDK 17（安卓构建需要）
+        if: matrix.kind == 'android'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
       - name: 安装依赖
-        if: matrix.app.kind == 'python-exe'
-        run: pip install -r "${{ matrix.app.dir }}/requirements.txt" "pyinstaller>=6,<7"
+        if: matrix.kind == 'python-exe'
+        run: pip install -r "${{ matrix.dir }}/requirements.txt" "pyinstaller>=6,<7"
 
       - name: 构建 Windows exe
-        if: matrix.app.kind == 'python-exe'
-        run: python "${{ matrix.app.dir }}/build.py"
+        if: matrix.kind == 'python-exe'
+        run: python "${{ matrix.dir }}/build.py"
 
       - name: 构建 Android APK
-        if: matrix.app.kind == 'android'
+        if: matrix.kind == 'android'
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: "8.7"
 
       - name: 编译 APK
-        if: matrix.app.kind == 'android'
-        working-directory: ${{ matrix.app.dir }}
+        if: matrix.kind == 'android'
+        working-directory: ${{ matrix.dir }}
         run: |
           java -version
           gradle assembleDebug --no-daemon --stacktrace
 
       # 双保险：不论 Gradle 怎么命名输出，统一改成清单里写的软件本名
       - name: 统一 APK 产物名
-        if: matrix.app.kind == 'android'
+        if: matrix.kind == 'android'
         shell: bash
         run: |
-          TARGET="${{ matrix.app.artifact }}"
-          find "${{ matrix.app.dir }}/app/build/outputs/apk/debug" -name '*.apk' | while read -r f; do
+          TARGET="${{ matrix.artifact }}"
+          find "${{ matrix.dir }}/app/build/outputs/apk/debug" -name '*.apk' | while read -r f; do
             if [ "$(basename "$f")" != "$TARGET" ]; then
               mv -- "$f" "$(dirname "$f")/$TARGET"
             fi
@@ -99,8 +106,8 @@ jobs:
         id: artifact
         shell: bash
         run: |
-          PATTERN="${{ matrix.app.artifact }}"
-          FILE=$(find "${{ matrix.app.dir }}" -type f -name "$(basename "$PATTERN")" | head -1)
+          PATTERN="${{ matrix.artifact }}"
+          FILE=$(find "${{ matrix.dir }}" -type f -name "$(basename "$PATTERN")" | head -1)
           if [ -z "$FILE" ]; then
             echo "未找到产物：$PATTERN"; exit 1
           fi
@@ -111,7 +118,7 @@ jobs:
         id: ver
         shell: bash
         run: |
-          VF="${{ matrix.app.dir }}/VERSION"
+          VF="${{ matrix.dir }}/VERSION"
           CUR=$(cat "$VF" 2>/dev/null || echo "0.0.0")
           MAJOR=$(echo "$CUR" | cut -d. -f1)
           MINOR=$(echo "$CUR" | cut -d. -f2)
@@ -120,15 +127,15 @@ jobs:
           echo "$NEXT" > "$VF"
           echo "version=$NEXT" >> "$GITHUB_OUTPUT"
           STAMP=$(date +%Y%m%d-%H%M)
-          echo "tag=${{ matrix.app.name }}-v${NEXT}-${STAMP}" >> "$GITHUB_OUTPUT"
+          echo "tag=${{ matrix.name }}-v${NEXT}-${STAMP}" >> "$GITHUB_OUTPUT"
 
       - name: 创建 Release 并上传产物（新增，不覆盖）
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
-          name: ${{ matrix.app.name }} v${{ steps.ver.outputs.version }}
+          name: ${{ matrix.name }} v${{ steps.ver.outputs.version }}
           body: |
-            ## ${{ matrix.app.name }} v${{ steps.ver.outputs.version }}
+            ## ${{ matrix.name }} v${{ steps.ver.outputs.version }}
 
             - 由 GitHub Actions 自动构建并备份
             - 每次构建生成独立 Release，旧版本不会被覆盖
@@ -141,6 +148,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "${{ matrix.app.dir }}/VERSION"
-          git commit -m "chore(${{ matrix.app.name }}): 版本更新至 v${{ steps.ver.outputs.version }}" || echo "无变更"
+          git add "${{ matrix.dir }}/VERSION"
+          git commit -m "chore(${{ matrix.name }}): 版本更新至 v${{ steps.ver.outputs.version }}" || echo "无变更"
           git push || echo "推送失败（无人值守时可忽略）"
