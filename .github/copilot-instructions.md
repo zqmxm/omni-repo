@@ -3,6 +3,7 @@
 本仓库的唯一权威规则是根目录 **`AGENTS.md`**，请先完整阅读再生成代码；跨 AI 使用说明见 `AI_GUIDE.md`。
 
 速记：
+- ⭐ 命名铁律：软件叫什么名字，GitHub 上就用什么名字（中文软件用中文名）——目录名、README 标题、exe/apk 文件名、Release tag、workflow 文件名、备份 `--name` 全部用软件本名，禁止英文代号/拼音缩写。例：透明橡皮擦 → `desktop/透明橡皮擦/`、`透明橡皮擦.exe`、`透明橡皮擦.yml`
 - 一个软件一个子目录，目录内必须自带 `README.md`（功能 / 运行 / 测试 / 出包）
 - 新项目用 `python scripts/new_project.py --name <name> --template <模板>`
 - Python 3.10+ / Node 20 / Android: JDK 17 + Gradle 8.7 + AGP 8.5.2 + compileSdk 34

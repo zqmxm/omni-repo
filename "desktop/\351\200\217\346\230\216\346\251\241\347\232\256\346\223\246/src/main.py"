@@ -1,7 +1,7 @@
 """透明橡皮擦 —— 像抠图一样擦掉图片中不要的像素，擦掉处为透明而非白色。
 
-运行：python desktop/transparent-eraser/src/main.py
-打包：python desktop/transparent-eraser/build.py
+运行：python desktop/透明橡皮擦/src/main.py
+打包：python desktop/透明橡皮擦/build.py
 """
 from __future__ import annotations
 

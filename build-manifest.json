@@ -1,18 +1,19 @@
 {
   "_说明": "新软件只需在这里加一条，auto-backup.yml 就会自动构建并备份到独立 Release",
+  "_命名铁律": "name 必须与软件真实名字完全一致（中文软件就用中文名），dir 用同名子目录，产物文件也用软件名。禁止用英文代号代替软件本名。",
   "_字段": {
-    "name": "软件名（英文小写/连字符）",
-    "dir": "项目目录（相对仓库根）",
+    "name": "软件本名（软件叫什么就写什么，支持中文，如 透明橡皮擦）",
+    "dir": "项目目录（相对仓库根，与 name 同名）",
     "kind": "python-exe | android | node | web",
-    "artifact": "产物文件名或相对路径",
+    "artifact": "产物文件名或相对路径（用软件名，如 透明橡皮擦.exe）",
     "runner": "可选，windows-latest 或 ubuntu-latest"
   },
   "apps": [
     {
-      "name": "transparent-eraser",
-      "dir": "desktop/transparent-eraser",
+      "name": "透明橡皮擦",
+      "dir": "desktop/透明橡皮擦",
       "kind": "python-exe",
-      "artifact": "TransparentEraser.exe",
+      "artifact": "透明橡皮擦.exe",
       "runner": "windows-latest"
     }
   ]

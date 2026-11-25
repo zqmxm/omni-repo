@@ -23,9 +23,11 @@
 - 版本格式：`<major>.<minor>.<patch>`，如 `1.0.0`
 - 每个软件目录下有 `VERSION` 文件记录当前版本
 - 每次 `publish` 默认 patch +1（`1.0.0` → `1.0.1`），可用 `--version` 指定
-- Release tag：`<name>-v<版本>-<YYYYMMDD-HHMM>`，例如 `transparent-eraser-v1.0.1-20261126-0130`
+- `<name>` 一律是**软件本名**：软件叫什么就写什么，中文软件用中文名（如 `透明橡皮擦`），禁止用英文代号/拼音缩写/繁简变体代替。这条规则跨 AI、跨软件一律生效。
+- Release tag：`<name>-v<版本>-<YYYYMMDD-HHMM>`，例如 `透明橡皮擦-v1.0.1-20261126-0130`
 - 源码 tag：`src/<name>/v<版本>`
-- Asset 名：`<name>-v<版本>-<平台>.<扩展名>`，例如 `transparent-eraser-v1.0.1-windows-x64.exe`
+- Asset 名：`<name>-v<版本>-<平台>.<扩展名>`，例如 `透明橡皮擦-v1.0.1-windows-x64.exe`
+- 项目目录、README 标题、exe/apk 文件名、workflow 文件名同样用软件本名，详见 `AGENTS.md` 的「命名铁律」。
 
 ---
 
@@ -57,9 +59,9 @@ python scripts/omni.py publish --name <软件名> --artifact <产物路径>
 
 ```bash
 python scripts/omni.py list                          # 列出所有备份版本
-python scripts/omni.py list --name transparent-eraser  # 只看某个软件
+python scripts/omni.py list --name 透明橡皮擦          # 只看某个软件（用软件本名）
 python scripts/omni.py download --tag <tag>          # 下载某版本的产物
-python scripts/omni.py version --name <软件名>       # 查看当前版本
+python scripts/omni.py version --name <软件本名>     # 查看当前版本
 ```
 
 ---

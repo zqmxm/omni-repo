@@ -6,10 +6,13 @@
 
 用法示例：
   python scripts/omni.py auth --token ghp_xxx
-  python scripts/omni.py publish --name transparent-eraser --artifact dist/App.exe
+  python scripts/omni.py publish --name 透明橡皮擦 --artifact desktop/透明橡皮擦/dist/透明橡皮擦.exe
   python scripts/omni.py list
-  python scripts/omni.py download --tag transparent-eraser-v1.0.1-20261126-0130
-  python scripts/omni.py version --name transparent-eraser
+  python scripts/omni.py download --tag 透明橡皮擦-v1.0.1-20261126-0130
+  python scripts/omni.py version --name 透明橡皮擦
+
+命名铁律：--name 传软件本名（软件叫什么就传什么，中文照传），仓库目录、
+Release tag、产物文件名全部用这个名字，不用英文代号。
 """
 from __future__ import annotations
 
@@ -76,7 +79,7 @@ def build_parser() -> argparse.ArgumentParser:
     a.set_defaults(func=cmd_auth)
 
     b = sub.add_parser("publish", help="备份源码并上传产物到新 Release（不覆盖旧版本）")
-    b.add_argument("--name", required=True, help="软件名，对应平台目录下的子目录名")
+    b.add_argument("--name", required=True, help="软件本名（中文软件就传中文），对应平台目录下的同名子目录")
     b.add_argument("--artifact", required=True, help="产物文件路径（exe/apk/zip 等）")
     b.add_argument("--project-dir", help="项目目录（默认自动在平台目录下查找）")
     b.add_argument("--version", help="指定版本号 X.Y.Z（默认自动递增 patch）")

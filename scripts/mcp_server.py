@@ -36,8 +36,8 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "name": {"type": "string", "description": "软件名（对应平台目录下的子目录名）"},
-                "artifact": {"type": "string", "description": "产物文件绝对路径（exe/apk/zip）"},
+                "name": {"type": "string", "description": "软件本名（软件叫什么就传什么，中文照传；对应平台目录下的同名子目录）"},
+                "artifact": {"type": "string", "description": "产物文件绝对路径（exe/apk/zip，文件名也用软件本名）"},
                 "version": {"type": "string", "description": "可选，指定版本号 X.Y.Z，默认自动递增"},
                 "project_dir": {"type": "string", "description": "可选，项目目录绝对路径"},
             },
@@ -60,7 +60,7 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "tag": {"type": "string", "description": "Release tag，如 transparent-eraser-v1.0.1-20261126-0130"},
+                "tag": {"type": "string", "description": "Release tag，如 透明橡皮擦-v1.0.1-20261126-0130"},
                 "output": {"type": "string", "description": "可选，保存目录，默认当前目录/downloads"},
                 "asset": {"type": "string", "description": "可选，指定资产文件名"},
             },

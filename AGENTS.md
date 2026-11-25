@@ -10,9 +10,25 @@
 
 - 已有目录：`python/` `web/` `node/` `android/` `desktop/` `scripts/` `data/`
 - 新语言/新端直接新建小写目录：`go/` `rust/` `java/` `flutter/` `miniapp/`
-- **一个软件 = 一个子目录**，目录名用小写字母/数字/连字符，不用空格和中文
-- 每个项目目录**必须**自带 `README.md`，写清：功能、怎么运行、依赖、怎么测试、怎么出包
+- **一个软件 = 一个子目录**
 - 空目录放 `.gitkeep`，不要提交构建产物
+
+### ⭐ 命名铁律（最高优先级，任何 AI 都必须遵守）
+
+> **软件叫什么名字，GitHub 上就用什么名字。** 一律用软件的真实名字（中文软件就用中文），
+> 禁止用英文代号、拼音缩写或繁简变体代替。这条规则跨 AI、跨软件、跨语言一律生效。
+
+- **项目目录名 = 软件本名**：例如软件叫「透明橡皮擦」，目录就是 `desktop/透明橡皮擦/`；
+  别的 AI 做的软件叫「图片批量压缩器」，目录就是 `python/图片批量压缩器/`。
+- **README 标题 = 软件本名**：项目 `README.md` 第一行 `# <软件本名>`。
+- **exe / apk / 安装包文件名 = 软件本名**：例如 `透明橡皮擦.exe`、`图片批量压缩器.apk`。
+  PyInstaller 用 `--name <软件本名>`，gradle `archivesBaseName` 也用软件本名。
+- **Release tag / 名称 / 备份标识 = 软件本名**：`透明橡皮擦-v1.0.0-<时间戳>`，
+  `omni.py publish --name 透明橡皮擦`，`build-manifest.json` 的 `name`/`dir`/`artifact` 全部用本名。
+- **workflow 文件名也用软件本名**：`desktop/透明橡皮擦/` 对应 `.github/workflows/透明橡皮擦.yml`。
+- 只允许的例外：平台根目录（`python/` `desktop/` 等）和通用脚本目录保持小写英文；
+  软件名本身不含空格，也不含 `/ \ : * ? " < > |` 等系统保留字符。
+- 每个项目目录**必须**自带 `README.md`，写清：功能、怎么运行、依赖、怎么测试、怎么出包
 
 ## 3. 加新项目的固定流程
 
@@ -38,7 +54,9 @@
 **每个软件做完并产出可执行文件后，必须备份。** 这是本仓库的核心能力，详见 `BACKUP_GUIDE.md`。
 
 - 一条命令完成源码 + 产物备份：
-  `python scripts/omni.py publish --name <软件名> --artifact <产物路径>`
+  `python scripts/omni.py publish --name <软件本名> --artifact <产物路径>`
+  （`<软件本名>` 必须是软件的真实名字，中文软件就传中文，例如 `--name 透明橡皮擦`；
+  脚本会自动用这个名字命名仓库目录、Release tag 和产物资产，绝不用英文代号）
 - 每个版本生成**独立的 Release**，tag 带版本号和时间戳，**永不覆盖旧版本**
 - 源码走仓库目录（每次新 commit + VERSION 文件递增），产物 exe/apk 走 Release（不入库，避开 100MB 限制）
 - 若产物由 CI 构建：在 `build-manifest.json` 加一条配置，`auto-backup.yml` 会自动构建并备份，无需手工上传

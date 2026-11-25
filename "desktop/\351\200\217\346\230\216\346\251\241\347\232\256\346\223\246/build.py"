@@ -1,7 +1,7 @@
 """一键打包 Windows 单文件 exe。
 
-用法：python desktop/transparent-eraser/build.py
-产物：desktop/transparent-eraser/dist/TransparentEraser.exe
+用法：python desktop/透明橡皮擦/build.py
+产物：desktop/透明橡皮擦/dist/透明橡皮擦.exe
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ def main() -> int:
         "--onefile",
         "--windowed",
         "--name",
-        "TransparentEraser",
+        "透明橡皮擦",
         "--distpath",
         str(ROOT / "dist"),
         "--workpath",
@@ -34,7 +34,7 @@ def main() -> int:
     ]
     print("构建命令：", " ".join(command), flush=True)
     completed = subprocess.run(command, cwd=ROOT, check=False)
-    exe = ROOT / "dist" / "TransparentEraser.exe"
+    exe = ROOT / "dist" / "透明橡皮擦.exe"
     if completed.returncode == 0 and exe.exists():
         print(f"构建完成：{exe}（{exe.stat().st_size / 1024 / 1024:.1f} MB）")
         return 0

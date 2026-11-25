@@ -21,7 +21,8 @@ API = "https://api.github.com"
 CONFIG_DIR = Path.home() / ".omni-repo"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 VERSION_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
-NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+# 软件名用软件本名（中文即可）。只排除空白与 git ref 非法字符，其余一律允许。
+NAME_RE = re.compile(r"^[^\s/\\~^:?*\[\]@{}][^\s/\\~^:?*\[\]@{}]{0,63}$")
 PLATFORM_DIRS = [
     "python", "web", "node", "desktop", "android",
     "go", "rust", "java", "flutter", "miniapp",
@@ -126,7 +127,7 @@ def get_ref(sha_or_ref: str, token: str) -> str:
 
 def find_project(name: str) -> Path:
     if not NAME_RE.fullmatch(name):
-        raise OmniError(f"软件名不合法：{name}（只允许字母数字点下划线连字符）")
+        raise OmniError(f"软件名不合法：{name}（用软件本名即可，支持中文；不能含空格或 / \\ : * ? 等符号）")
     candidates = [ROOT / d / name for d in PLATFORM_DIRS]
     candidates += [ROOT / name]
     for p in candidates:
@@ -304,7 +305,8 @@ def list_releases(token: str, name: str | None = None) -> list[dict]:
 
 def download_asset(token: str, tag: str, dest: Path, asset_name: str | None = None) -> Path:
     owner, repo = get_repo()
-    releases, _ = api("GET", f"/repos/{owner}/{repo}/releases/tags/{tag}", token)
+    safe_tag = urllib.parse.quote(tag, safe="")
+    releases, _ = api("GET", f"/repos/{owner}/{repo}/releases/tags/{safe_tag}", token)
     assets = releases.get("assets", [])
     if not assets:
         raise OmniError(f"Release {tag} 没有可下载资产")

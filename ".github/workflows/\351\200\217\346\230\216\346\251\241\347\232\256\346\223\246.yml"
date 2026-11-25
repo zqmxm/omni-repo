@@ -1,10 +1,10 @@
-name: Build Transparent Eraser EXE
+name: 构建透明橡皮擦 EXE
 
 on:
   push:
     paths:
-      - "desktop/transparent-eraser/**"
-      - ".github/workflows/transparent-eraser.yml"
+      - "desktop/透明橡皮擦/**"
+      - ".github/workflows/透明橡皮擦.yml"
   workflow_dispatch:
 
 permissions:
@@ -19,16 +19,16 @@ jobs:
         with:
           python-version: "3.11"
       - name: 安装依赖
-        run: pip install -r desktop/transparent-eraser/requirements.txt
+        run: pip install -r desktop/透明橡皮擦/requirements.txt
       - name: 单元测试
-        run: python -m unittest discover -s desktop/transparent-eraser/tests -v
+        run: python -m unittest discover -s desktop/透明橡皮擦/tests -v
         env:
           QT_QPA_PLATFORM: offscreen
       - name: 打包 exe
-        run: python desktop/transparent-eraser/build.py
+        run: python desktop/透明橡皮擦/build.py
       - name: 上传产物
         uses: actions/upload-artifact@v4
         with:
-          name: TransparentEraser-Windows-x64
-          path: desktop/transparent-eraser/dist/TransparentEraser.exe
+          name: 透明橡皮擦-Windows-x64
+          path: desktop/透明橡皮擦/dist/透明橡皮擦.exe
           if-no-files-found: error

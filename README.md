@@ -36,7 +36,9 @@ cd omni-repo
 | `BACKUP_GUIDE.md` | **自动备份系统规范** | ✅ 版本化 / 不覆盖 / 对话内上传下载 |
 | `build-manifest.json` | **自动构建备份清单** | ✅ 加一行即自动出包备份 |
 
-**唯一铁律**：一个软件一个子目录，目录里必须自带 `README.md` 写清「怎么跑」。互不干扰，CI 按改动路径分别检查。
+**两条铁律**：
+1. 一个软件一个子目录，目录里必须自带 `README.md` 写清「怎么跑」。互不干扰，CI 按改动路径分别检查。
+2. ⭐ **命名铁律：软件叫什么名字，GitHub 上就叫什么名字。** 软件本名（中文软件用中文名）同时用作：项目目录名、README 标题、exe/apk 文件名、Release tag、workflow 文件名和备份 `--name`。禁止用英文代号/拼音缩写代替。例：「透明橡皮擦」对应 `desktop/透明橡皮擦/`、`透明橡皮擦.exe`、`透明橡皮擦.yml`、tag `透明橡皮擦-v1.0.0-...`。任何 AI 做的软件一律照此执行，详见 `AGENTS.md`。
 
 ---
 
@@ -64,7 +66,7 @@ python scripts/omni.py download --tag <tag>                 # 下载任意版本
 | --- | --- | --- |
 | `ci.yml` | 每次 push | Python 单测 / Node 冒烟 / Web 检查 / 脚手架自检 |
 | `android.yml` | `android/**` 改动或手动 | `app-debug.apk` artifact |
-| `transparent-eraser.yml` | 透明橡皮擦改动或手动 | exe artifact |
+| `透明橡皮擦.yml` | 透明橡皮擦改动或手动 | 透明橡皮擦.exe artifact |
 | `auto-backup.yml` | 清单/源码改动或手动 | **自动构建 + 独立 Release 备份（不覆盖）** |
 
 产物在仓库 → **Actions** → 对应工作流 → Artifacts，或 **Releases** 页签直接下载。
