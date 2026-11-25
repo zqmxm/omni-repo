@@ -192,9 +192,15 @@ def sync_source(token: str, message: str) -> str:
     tree_sha = subprocess.check_output(
         ["git", "-C", str(ROOT), "write-tree"], text=True).strip()
     entries = []
-    for line in subprocess.check_output(
-        ["git", "-C", str(ROOT), "ls-tree", "-r", tree_sha], text=True
-    ).splitlines():
+    # -c core.quotepath=false：确保中文路径按 UTF-8 原样输出，
+    # 否则 git 会把中文转成 "\351\200\217" 八进制转义，导致远程 tree 路径错乱。
+    ls_out = subprocess.check_output(
+        ["git", "-C", str(ROOT), "-c", "core.quotepath=false",
+         "ls-tree", "-r", "-z", tree_sha]
+    ).decode("utf-8")
+    for line in ls_out.split("\0"):
+        if not line:
+            continue
         meta, path = line.split("\t", 1)
         mode, typ, sha = meta.split()
         entries.append({"path": path, "mode": mode, "type": typ, "sha": sha})
