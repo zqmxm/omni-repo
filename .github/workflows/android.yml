@@ -26,11 +26,13 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: 安装 SDK 组件
-        run: sdkmanager "platforms;android-34" "build-tools;34.0.0" > /dev/null
+      # ubuntu-latest 镜像已预装 Android SDK（含 platform 34 / build-tools 34）
+      # 且 licenses 已接受；AGP 会自动补齐缺失组件。
+      # 早期版本额外调用 setup-android + sdkmanager 反而因权限冲突失败，故移除。
+      - name: 确认 Android SDK
+        run: |
+          echo "ANDROID_HOME=${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          ls "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/platforms" 2>/dev/null | head -10 || true
 
       - name: Gradle 8.7
         uses: gradle/actions/setup-gradle@v3
