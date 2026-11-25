@@ -42,8 +42,8 @@ cd omni-repo
 
 | workflow | 触发 | 产出 |
 | --- | --- | --- |
-| `ci.yml` | 每次 push | Python 单测 / Node 冒烟 / Web 检查 |
-| `android.yml` | `android/**` 改动或手动 | **`app-debug.apk` 可下载产物** |
+| `ci.yml` | 每次 push | Python 单测 / Node 冒烟 / Web 检查 / 六种脚手架模板自检 |
+| `android.yml` | `android/**` 改动或手动 | **`app-debug.apk` 可下载产物**（含合法性校验） |
 | `desktop/` 里的配方 | 按需复制 | Windows exe，参考 PyInstaller |
 
 APK 你在网页上就能拿：仓库 → **Actions** → `Android APK` → 底部 Artifacts → `omni-android-debug-apk`，下载后传到手机安装（需允许「未知来源」）。

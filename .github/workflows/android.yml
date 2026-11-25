@@ -43,6 +43,20 @@ jobs:
         working-directory: android
         run: gradle assembleDebug --no-daemon --stacktrace
 
+      - name: 校验 APK 有效性
+        run: |
+          python3 - <<'PY'
+          import glob, os, zipfile
+          files = glob.glob('android/app/build/outputs/apk/debug/*.apk')
+          assert len(files) == 1, f'期望 1 个 APK，实际 {files}'
+          p = files[0]
+          with zipfile.ZipFile(p) as z:
+              names = z.namelist()
+          assert 'AndroidManifest.xml' in names, names[:20]
+          assert 'classes.dex' in names, names[:20]
+          print(f'APK OK: {p} ({os.path.getsize(p)} bytes), {len(names)} entries')
+          PY
+
       - name: 上传 APK
         uses: actions/upload-artifact@v4
         with:
