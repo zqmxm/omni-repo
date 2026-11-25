@@ -1,0 +1,34 @@
+name: Build Transparent Eraser EXE
+
+on:
+  push:
+    paths:
+      - "desktop/transparent-eraser/**"
+      - ".github/workflows/transparent-eraser.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: 安装依赖
+        run: pip install -r desktop/transparent-eraser/requirements.txt
+      - name: 单元测试
+        run: python -m unittest discover -s desktop/transparent-eraser/tests -v
+        env:
+          QT_QPA_PLATFORM: offscreen
+      - name: 打包 exe
+        run: python desktop/transparent-eraser/build.py
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: TransparentEraser-Windows-x64
+          path: desktop/transparent-eraser/dist/TransparentEraser.exe
+          if-no-files-found: error

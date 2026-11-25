@@ -29,7 +29,7 @@ cd omni-repo
 | `web/` | 静态网页、单页小工具（零依赖，双击即开） | ✅ 带首页 |
 | `node/` | Node 服务、前端工程、构建脚本 | ✅ `node index.js` 可跑 |
 | `android/` | **Android 原生工程，CI 自动出 APK** | ✅ 最小 Gradle 工程 |
-| `desktop/` | Windows exe / 桌面应用源码与打包说明 | ✅ 说明 + 打包配方 |
+| `desktop/` | Windows exe / 桌面应用源码与打包说明 | ✅ 说明 + 打包配方 + 透明橡皮擦工具 |
 | `scripts/` | 通用脚手架、辅助脚本 | ✅ `new_project.py` |
 | `data/` | 样例数据、配置、素材 | 占位，按需放 |
 | `go/` `rust/` `java/` `flutter/` `miniapp/` | 其他语言 / 端 | 按需新建，规则见 AGENTS.md |
