@@ -63,6 +63,15 @@ def render_readme(name: str, template: str, has_original: bool) -> str:
         "",
         "（写清楚成品在哪个文件夹、叫什么名字、怎么打开）",
         "",
+        "## 交付清单（必须留下，缺一不可）",
+        "",
+        "- [ ] 源码：本目录里已有真实实现代码（不只是 README）",
+        "- [ ] 成品：已产出 `*.exe`（Windows）或 `*.apk`（Android），并随备份上传到 Release",
+        "- [ ] 备份：已运行 `python scripts/omni.py publish --name <软件本名> --artifact <exe/apk路径>`",
+        "- [ ] 回复：已用中文告知源码位置和 exe/apk 下载链接",
+        "",
+        "> 规则来源：仓库根目录 `AGENTS.md` 的「交付铁律」。只交代码或只交成品都算没做完。",
+        "",
         "## 运行",
         "",
         "（写清楚：怎么跑、依赖、怎么测试、怎么出包）",
@@ -108,6 +117,7 @@ def main() -> int:
         )
 
     print(f"已生成 {dst.relative_to(ROOT)}/（模板：{args.template}）")
+    print("提醒（交付铁律）：完成后必须同时留下源码 + exe/apk 成品，并用 omni.py publish 备份；只交代码不算完成。")
     return 0
 
 

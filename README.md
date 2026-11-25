@@ -36,9 +36,10 @@ cd omni-repo
 | `BACKUP_GUIDE.md` | **自动备份系统规范** | ✅ 版本化 / 不覆盖 / 对话内上传下载 |
 | `build-manifest.json` | **自动构建备份清单** | ✅ 加一行即自动出包备份 |
 
-**两条铁律**：
+**三条铁律**：
 1. 一个软件一个子目录，目录里必须自带 `README.md` 写清「怎么跑」。互不干扰，CI 按改动路径分别检查。
 2. ⭐ **命名铁律：软件叫什么名字，GitHub 上就叫什么名字。** 软件本名（中文软件用中文名）同时用作：项目目录名、README 标题、exe/apk 文件名、Release tag、workflow 文件名和备份 `--name`。禁止用英文代号/拼音缩写代替。例：「透明橡皮擦」对应 `desktop/透明橡皮擦/`、`透明橡皮擦.exe`、`透明橡皮擦.yml`、tag `透明橡皮擦-v1.0.0-...`。任何 AI 做的软件一律照此执行，详见 `AGENTS.md`。
+3. ⭐⭐ **交付铁律：源码 + exe/apk 成品缺一不可。** 任何 AI 用这个仓库做软件，必须同时留下**源码**（提交进仓库目录）和**可运行成品**（Windows 为 `*.exe`，Android 为 `*.apk`，上传到 GitHub Release）。只交代码、只给运行命令、只给网页或只给源码包都算没做完。`omni.py publish` 会强制校验产物后缀和源码存在性，不满足直接报错。详见 `AGENTS.md`。
 
 ---
 
@@ -54,6 +55,7 @@ python scripts/omni.py download --tag <tag>                 # 下载任意版本
 ```
 
 - **源码**进仓库目录（新 commit + VERSION 递增），**产物**进独立 Release（不受 100MB 限制）
+- **强制交付**：`--artifact` 只接受 `.exe` 或 `.apk`，项目目录必须有真实源码；zip/脚本/网页/空目录会被拒绝，不能只交一半
 - 每做一个新版本就**新增一个 Release**，旧版本永久保留，绝不覆盖
 - 支持 MCP 的 AI 注册 `scripts/mcp_server.py` 后，可**在对话框里直接上传/下载 exe**，不用打开 GitHub（配置见 `mcp-config.example.json`）
 - CI 构建的产物：在 `build-manifest.json` 加一行，`auto-backup.yml` 自动打包并备份
@@ -96,7 +98,7 @@ python scripts/new_project.py --name my-app  --template android
 - 「给 Android App 加个相机拍照页面，APK 照样能打出来」
 - 「加个 Go 写的 HTTP 接口，配好构建」
 
-对方会建目录、写代码、补测试、配 CI、推上来，并告诉你链接。**换个 AI 也一样**，因为它读的是同一份 `AGENTS.md`，不是某个平台的隐藏规则。
+对方会建目录、写代码、补测试、**打出 exe/apk 成品**、配 CI、推上来，并用中文告诉你源码位置和 exe/apk 下载链接。**只写代码不给成品不算完成**。**换个 AI 也一样**，因为它读的是同一份 `AGENTS.md`，不是某个平台的隐藏规则。
 
 ---
 

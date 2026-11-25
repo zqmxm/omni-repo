@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """omni-repo 备份总控 CLI。
 
-任何 AI 做完软件后，只需一条命令即可把源码和产物备份到 GitHub，
+任何 AI 做完软件后，只需一条命令即可把源码和 exe/apk 成品备份到 GitHub，
 且每个版本独立保留、永不覆盖。
+
+交付铁律（强制）：源码 + exe/apk 缺一不可。--artifact 只接受 .exe 或 .apk，
+项目目录必须有真实源码；否则 publish 直接报错，不许只交一半。
 
 用法示例：
   python scripts/omni.py auth --token ghp_xxx
@@ -78,9 +81,9 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--token", required=True, help="有 repo 权限的 Personal Access Token")
     a.set_defaults(func=cmd_auth)
 
-    b = sub.add_parser("publish", help="备份源码并上传产物到新 Release（不覆盖旧版本）")
+    b = sub.add_parser("publish", help="备份源码 + exe/apk 成品到新 Release（强制校验，不覆盖旧版本）")
     b.add_argument("--name", required=True, help="软件本名（中文软件就传中文），对应平台目录下的同名子目录")
-    b.add_argument("--artifact", required=True, help="产物文件路径（exe/apk/zip 等）")
+    b.add_argument("--artifact", required=True, help="成品文件路径：必须是 .exe 或 .apk（源码包/脚本/网页不被接受）")
     b.add_argument("--project-dir", help="项目目录（默认自动在平台目录下查找）")
     b.add_argument("--version", help="指定版本号 X.Y.Z（默认自动递增 patch）")
     b.add_argument("--bump", choices=["major", "minor", "patch"], default="patch",

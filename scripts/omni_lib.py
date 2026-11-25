@@ -27,6 +27,14 @@ PLATFORM_DIRS = [
     "python", "web", "node", "desktop", "android",
     "go", "rust", "java", "flutter", "miniapp",
 ]
+# 交付铁律：成品只接受 exe/apk；项目目录必须有真实源码文件
+DELIVERY_ARTIFACT_SUFFIXES = {".exe", ".apk"}
+SOURCE_SUFFIXES = {
+    ".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".kt", ".kts",
+    ".go", ".rs", ".c", ".cpp", ".cc", ".h", ".hpp", ".cs",
+    ".html", ".htm", ".css", ".vue", ".dart", ".sh", ".bat", ".ps1",
+}
+SKIP_DIRS = {"build", "dist", "__pycache__", ".git", "node_modules"}
 
 
 class OmniError(RuntimeError):
@@ -176,6 +184,42 @@ def platform_label(path: Path) -> str:
         ".apk": "android", ".aab": "android",
         ".dmg": "macos", ".zip": "bundle", ".tar.gz": "bundle",
     }.get(suffix, suffix.lstrip(".") or "bin")
+
+
+def ensure_delivery(name: str, artifact: Path, project: Path) -> None:
+    """强制交付铁律：源码 + exe/apk 成品缺一不可，否则拒绝备份。
+
+    这是 `AGENTS.md`「交付铁律」的可执行版本，任何 AI 都不能绕过：
+    - 产物必须是真实存在的 .exe 或 .apk
+    - 项目目录必须存在、有 README.md，且含至少一个真实源码文件
+    """
+    suffix = artifact.suffix.lower()
+    if suffix not in DELIVERY_ARTIFACT_SUFFIXES:
+        raise OmniError(
+            f"交付铁律：成品必须是 .exe 或 .apk，当前是「{suffix or '无后缀'}」：{artifact.name}。\n"
+            "Windows 软件请用 PyInstaller 打成 exe；Android 软件请用 Gradle 打出 apk。\n"
+            "不接受源码包、脚本、网页、构建命令当成品。详见 AGENTS.md「交付铁律」。"
+        )
+    if not artifact.is_file():
+        raise OmniError(f"交付铁律：成品文件不存在：{artifact}")
+    if not project.is_dir():
+        raise OmniError(
+            f"交付铁律：找不到源码目录：{project}。请在平台目录下用软件本名建项目目录，"
+            "或用 --project-dir 指定。"
+        )
+    if not (project / "README.md").is_file():
+        raise OmniError(f"交付铁律：项目目录缺少 README.md：{project}")
+    source_files = [
+        p for p in project.rglob("*")
+        if p.is_file()
+        and not SKIP_DIRS.intersection(p.relative_to(project).parts)
+        and p.suffix.lower() in SOURCE_SUFFIXES
+    ]
+    if not source_files:
+        raise OmniError(
+            f"交付铁律：项目目录里没有源码文件：{project}。\n"
+            "只有成品没有源码不算交付，请先把实现代码放进项目目录再备份。"
+        )
 
 
 # ---------- 源码同步（Git Data API，兼容代理环境） ----------
@@ -433,8 +477,9 @@ def download_asset(token: str, tag: str, dest: Path, asset_name: str | None = No
 
 def publish(token: str, name: str, artifact: Path, bump: str = "patch",
             version: str | None = None, project_dir: Path | None = None) -> dict:
-    """完整备份流程：源码 + 版本 + 产物，一次完成。"""
+    """完整备份流程：源码 + 版本 + exe/apk 产物，一次完成。"""
     project = project_dir or find_project(name)
+    ensure_delivery(name, artifact, project)  # 交付铁律：缺源码或成品不是 exe/apk 就拒绝
     current = read_version(project)
     new_version = version or bump_version(current, bump)
     write_version(project, new_version)

@@ -15,7 +15,7 @@
 }
 
 提供的工具：
-  omni_publish  - 备份源码并把 exe/apk 上传到新 Release（不覆盖）
+  omni_publish  - 备份源码并把 exe/apk 上传到新 Release（强制源码+成品校验，不覆盖）
   omni_list     - 列出所有备份版本
   omni_download - 下载某个版本的产物到本地
   omni_version  - 查看软件当前版本
@@ -32,12 +32,12 @@ import omni_lib as lib
 TOOLS = [
     {
         "name": "omni_publish",
-        "description": "把 AI 做好的软件备份到 GitHub：源码提交 + 产物上传到独立 Release，每个版本不覆盖旧版本。",
+        "description": "把 AI 做好的软件备份到 GitHub：源码提交 + exe/apk 成品上传到独立 Release。强制校验源码存在且产物为 .exe 或 .apk，缺一不可；每个版本不覆盖旧版本。",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "name": {"type": "string", "description": "软件本名（软件叫什么就传什么，中文照传；对应平台目录下的同名子目录）"},
-                "artifact": {"type": "string", "description": "产物文件绝对路径（exe/apk/zip，文件名也用软件本名）"},
+                "artifact": {"type": "string", "description": "成品文件绝对路径，必须是 .exe 或 .apk（源码包/脚本/网页不接受），文件名也用软件本名"},
                 "version": {"type": "string", "description": "可选，指定版本号 X.Y.Z，默认自动递增"},
                 "project_dir": {"type": "string", "description": "可选，项目目录绝对路径"},
             },

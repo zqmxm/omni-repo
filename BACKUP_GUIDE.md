@@ -4,6 +4,10 @@
 
 本文件是 `AGENTS.md` 的补充规范。任何 AI 在本仓库工作时，交付阶段必须按这里的方式备份。
 
+> ⭐⭐ **交付铁律**：任何软件都必须同时留下**源码 + exe/apk 成品**，缺一不可。
+> `publish` 会强制校验：产物必须是 `.exe` 或 `.apk`，项目目录必须有源码文件；不满足直接报错。
+> 不接受只交源码包、脚本、网页、构建命令或空项目。
+
 ---
 
 ## 1. 三层存储模型
@@ -12,7 +16,7 @@
 | --- | --- | --- | --- |
 | 源码层 | GitHub 仓库目录 | 全部源码、README、测试、配置 | 每次备份生成新 commit，git 历史天然不覆盖 |
 | 版本层 | git tag `src/<name>/v<版本>` | 标记源码快照 | tag 名带版本号，递增不重复 |
-| 产物层 | GitHub Release assets | exe / apk / zip / 安装包 | 每个版本一个独立 Release，tag 带时间戳 |
+| 产物层 | GitHub Release assets | **exe / apk（必须是这两种）** + 源码 zip | 每个版本一个独立 Release，tag 带时间戳 |
 
 **为什么 exe 不放仓库目录**：GitHub 单文件上限 100MB、仓库软上限 1GB，而 Release 单资产上限 2GB 且不计入仓库容量。构建产物（exe/apk/dist/build）绝不入库，只进 Release。
 
@@ -61,10 +65,11 @@ python scripts/omni.py publish --name <软件名> --artifact <产物路径>
 ```
 
 `publish` 会自动完成：
-1. 把工作区所有源码变更提交并同步到 GitHub（走 API，兼容代理环境）
-2. 递增版本、打源码 tag
-3. 创建 Release 并把 exe/apk 上传为 asset
-4. 输出 Release 下载链接
+1. **先校验**：项目目录有源码 + `--artifact` 是 `.exe` 或 `.apk`（否则立即报错，不生成半成品 Release）
+2. 把工作区所有源码变更提交并同步到 GitHub（走 API，兼容代理环境）
+3. 递增版本、打源码 tag
+4. 创建 Release 并把 exe/apk 上传为 asset，同时上传源码 zip
+5. 输出 Release 下载链接（回复用户时必须同时给出源码位置和 exe/apk 下载链接）
 
 其他命令：
 
@@ -93,7 +98,7 @@ python scripts/omni.py version --name <软件本名>     # 查看当前版本
 
 `python/` `web/` `node/` `desktop/`（Windows exe）`android/`（APK）`go/` `rust/` `java/` `flutter/` `miniapp/`（小程序）
 
-新平台直接建小写目录，规则见 `AGENTS.md`。产物统一走 Release，扩展名按平台区分：`.exe` / `.apk` / `.zip` / `.dmg` 等。
+新平台直接建小写目录，规则见 `AGENTS.md`。**成品统一走 Release，且只接受 `.exe` 或 `.apk`**：Windows 目标出 exe，Android 目标出 apk；Python/Web/Node 等也必须以 exe 形式交付。源码 zip 是附加物，不能代替成品。
 
 ---
 
