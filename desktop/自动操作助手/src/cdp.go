@@ -511,6 +511,21 @@ func (b *bgBrowser) inputText(selector, text string) error {
 	return nil
 }
 
+// pressEnter 向当前聚焦元素发送回车键（CDP 键盘事件，不占系统键鼠）
+func (b *bgBrowser) pressEnter() error {
+	params := map[string]interface{}{
+		"key": "Enter", "code": "Enter", "text": "\r",
+		"windowsVirtualKeyCode": 13, "nativeVirtualKeyCode": 13,
+	}
+	for _, t := range []string{"keyDown", "keyUp"} {
+		params["type"] = t
+		if _, err := b.ws.call("Input.dispatchKeyEvent", params, b.sessionID, 5*time.Second); err != nil {
+			return fmt.Errorf("发送回车失败：%w", err)
+		}
+	}
+	return nil
+}
+
 func snapshotDir(dir string) map[string]int64 {
 	m := make(map[string]int64)
 	entries, _ := os.ReadDir(dir)
@@ -574,8 +589,11 @@ func (b *bgBrowser) download(url, saveDir string, timeoutSec int) (string, error
 
 // downloadByClick 打开页面后点击下载按钮，再等待文件落盘
 func (b *bgBrowser) downloadByClick(url, selector, saveDir string, timeoutSec int) (string, error) {
-	if err := b.openURL(url); err != nil {
-		return "", err
+	// url 为空表示已停留在目标页面（智能体模式），不重新导航，避免丢失页面状态
+	if strings.TrimSpace(url) != "" {
+		if err := b.openURL(url); err != nil {
+			return "", err
+		}
 	}
 	before := snapshotDir(b.downloadDir)
 	if err := b.click(selector, ""); err != nil {

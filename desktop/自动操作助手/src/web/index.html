@@ -81,6 +81,8 @@
     font-family:inherit;transition:.2s}
   .prompt-row textarea:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px rgba(99,102,241,.15)}
   .prompt-row textarea::placeholder{color:var(--muted)}
+  .win-input{flex:1;min-width:180px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:7px 10px;font-size:12.5px;outline:none}
+  .win-input:focus{border-color:var(--acc)}
   .btn{border:none;border-radius:11px;padding:0 20px;height:46px;font-size:13.5px;
     font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;
     transition:.2s;font-family:inherit;white-space:nowrap}
@@ -192,7 +194,7 @@
     </nav>
     <div class="side-foot">
       <div><span class="status-dot" id="dot"></span><b id="statusText">就绪</b></div>
-      <small>NeuralFlow v1.0 · 本地运行<br>数据不出本机</small>
+      <small>NeuralFlow v1.1 · 本地引擎 · 无需 API<br>数据不出本机</small>
     </div>
   </aside>
 
@@ -201,7 +203,7 @@
     <header class="top">
       <h2 id="title">AI 助手 <span>用自然语言驱动自动化</span></h2>
       <div class="top-right">
-        <span class="pill ai">✦ AI 视觉内核</span>
+        <span class="pill ai">✦ 本地智能引擎 · 无需 API</span>
         <span class="pill" id="modePill">模式：网页后台</span>
       </div>
     </header>
@@ -210,23 +212,24 @@
     <section class="view on" id="v-ai">
       <div class="hero">
         <h3>你好，我是 <em>NeuralFlow</em> 👋</h3>
-        <p>告诉我你想做什么，我会"看"页面、自己思考、逐步执行。全程在独立后台浏览器操作，<b style="color:var(--txt)">不占用你的鼠标键盘</b>。</p>
+        <p>告诉我你想做什么，我会在本机<b style="color:var(--txt)">离线理解指令</b>、自动匹配页面元素并逐步执行——<b style="color:var(--txt)">无需 API Key、无需联网</b>，全程在独立后台浏览器操作，不占用你的鼠标键盘。</p>
       </div>
       <div class="chat-wrap">
         <div class="input-card">
           <div class="mode-row">
             <button class="mode-btn on" data-mode="web">🌐 网页自动化</button>
             <button class="mode-btn" data-mode="desktop">🖥 桌面软件</button>
+            <input id="winTitle" class="win-input" placeholder="桌面模式：目标窗口标题关键词（如：记事本）" style="display:none">
           </div>
           <label>任务指令</label>
           <div class="prompt-row">
-            <textarea id="prompt" placeholder="例如：打开 example.com，找到下载按钮并下载文件到 D:/下载&#10;例如：打开记事本，输入「你好世界」并保存"></textarea>
+            <textarea id="prompt" placeholder="例如：打开 example.com，点击下载按钮&#10;例如：搜索“天气”&#10;例如：打开 https://xxx/file.zip 并下载"></textarea>
             <button class="btn primary" id="runBtn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>启动</button>
           </div>
           <div class="hints" id="hints">
-            <span class="hint">打开 https://example.com 并截图观察到的内容</span>
-            <span class="hint">搜索"AI 自动化"并把第一条结果标题告诉我</span>
-            <span class="hint">下载页面上的 PDF 文件到 D:/下载</span>
+            <span class="hint">打开 example.com，点击登录</span>
+            <span class="hint">打开 bilibili.com，搜索“人工智能”</span>
+            <span class="hint">打开 https://xxx.com/file.zip 并下载</span>
           </div>
         </div>
         <div id="timeline" class="timeline"></div>
@@ -250,20 +253,25 @@
     <section class="view" id="v-set">
       <div class="settings">
         <div class="setting-card">
-          <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a7 7 0 0 1 7 7c0 3-2 4-2 7a5 5 0 0 1-10 0c0-3-2-4-2-7a7 7 0 0 1 7-7z"/></svg>AI 模型配置</h4>
+          <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a7 7 0 0 1 7 7c0 3-2 4-2 7a5 5 0 0 1-10 0c0-3-2-4-2-7a7 7 0 0 1 7-7z"/></svg>智能引擎</h4>
           <div class="field"><label>服务商</label>
             <select id="cfgProvider">
-              <option value="qwen-vl">通义千问 VL（推荐·国内直连）</option>
-              <option value="doubao">豆包视觉（火山引擎）</option>
-              <option value="openai">OpenAI</option>
+              <option value="local">本地智能引擎（推荐·无需 API·完全离线）</option>
+              <option value="qwen-vl">通义千问 VL（云端·国内直连）</option>
+              <option value="doubao">豆包视觉（云端·火山引擎）</option>
+              <option value="openai">OpenAI（云端）</option>
               <option value="custom">自定义（OpenAI 兼容）</option>
             </select>
           </div>
+          <div class="test-result ok" id="localNote" style="display:none">✓ 本地引擎：指令在本机解析，自动匹配页面元素。零成本、零联网、毫秒响应，适合常规自动化任务。</div>
+          <div id="apiFields">
+          <small style="display:block;margin-bottom:12px;color:var(--muted)">云端模型仅用于复杂推理任务（如“把第一条结果的标题告诉我”）；简单任务本地引擎即可完成，且零成本。</small>
           <div class="row">
             <div class="field"><label>API Key</label><input type="password" id="cfgKey" placeholder="sk-..."><small>仅保存在本机，不会上传</small></div>
             <div class="field"><label>模型名称</label><input id="cfgModel" placeholder="留空自动填充"></div>
           </div>
           <div class="field"><label>API 地址</label><input id="cfgEndpoint" placeholder="留空自动填充默认地址"><small>兼容 OpenAI chat/completions 格式</small></div>
+          </div>
           <div style="display:flex;gap:10px;align-items:center">
             <button class="btn ghost" id="testBtn">测试连接</button>
             <button class="btn primary" id="saveBtn">保存配置</button>
@@ -294,7 +302,7 @@ const titles = {
   ai:['AI 助手','用自然语言驱动自动化'],
   flow:['流程编排','组合动作，一键复用'],
   log:['运行日志','每一步都清晰可见'],
-  set:['设置','配置 AI 模型与运行参数']
+  set:['设置','引擎与运行参数（默认本地引擎，开箱即用）']
 };
 $('nav').addEventListener('click', e=>{
   const b = e.target.closest('button[data-v]'); if(!b) return;
@@ -308,7 +316,9 @@ document.querySelectorAll('.mode-btn').forEach(b=>b.addEventListener('click',()=
   document.querySelectorAll('.mode-btn').forEach(x=>x.classList.remove('on'));
   b.classList.add('on');
   $('modePill').textContent = '模式：'+(S.mode==='web'?'网页后台':'桌面软件');
+  $('winTitle').style.display = S.mode==='desktop' ? '' : 'none';
 }));
+window.toggleApi=toggleApi;
 $('hints').addEventListener('click', e=>{
   const h = e.target.closest('.hint'); if(h) $('prompt').value = h.textContent;
 });
@@ -343,7 +353,8 @@ async function api(path, data){
 async function loadConfig(){
   try{
     S.cfg = await api('/api/config');
-    $('cfgProvider').value=S.cfg.provider||'qwen-vl';
+    $('cfgProvider').value=S.cfg.provider||'local';
+    toggleApi();
     $('cfgKey').value=S.cfg.apiKey||'';
     $('cfgModel').value=S.cfg.model||'';
     $('cfgEndpoint').value=S.cfg.endpoint||'';
@@ -353,6 +364,12 @@ async function loadConfig(){
   }catch(e){ toast('读取配置失败：'+e.message,'err'); }
 }
 
+function toggleApi(){
+  const local=$('cfgProvider').value==='local';
+  $('apiFields').style.display=local?'none':'';
+  $('localNote').style.display=local?'block':'none';
+}
+$('cfgProvider').onchange=toggleApi;
 $('saveBtn').onclick = async ()=>{
   const cfg={provider:$('cfgProvider').value,apiKey:$('cfgKey').value,model:$('cfgModel').value,
     endpoint:$('cfgEndpoint').value,maxSteps:+$('cfgSteps').value||12,
@@ -383,14 +400,14 @@ function addStep(icon,cls,title,desc,badge,code){
 $('runBtn').onclick = async ()=>{
   const prompt=$('prompt').value.trim();
   if(!prompt){ toast('请先输入任务指令','err'); return; }
-  if(!S.cfg || !S.cfg.apiKey){ toast('请先在「设置」里填写 API Key','err');
+  if(S.cfg && S.cfg.provider && S.cfg.provider!=='local' && !S.cfg.apiKey){ toast('云端模式请先在「设置」里填写 API Key，或切换为本地引擎','err');
     document.querySelector('[data-v=set]').click(); return; }
   S.running=true; $('runBtn').disabled=true; $('runBtn').innerHTML='<span class="spinner"></span> 运行中';
   $('timeline').innerHTML='<div class="step empty"><div class="step-body" style="text-align:center;color:var(--muted)">AI 正在思考… ✦</div></div>';
   setStatus('运行中',true); log('▶ 任务启动：'+prompt,'ai');
   try{
     const res = await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({instruction:prompt,mode:S.mode,window:''})});
+      body:JSON.stringify({instruction:prompt,mode:S.mode,window:$('winTitle').value.trim()})});
     const reader=res.body.getReader(), dec=new TextDecoder(); let buf='';
     while(true){
       const {done,value}=await reader.read(); if(done) break;

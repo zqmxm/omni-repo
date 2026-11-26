@@ -83,6 +83,7 @@ type AIAction struct {
 	AutoID     string `json:"autoid"`     // 桌面控件自动化 ID
 	Window     string `json:"window"`     // 桌面窗口标题
 	Seconds    int    `json:"seconds"`    // wait / download 超时
+	Enter      bool   `json:"enter,omitempty"` // 输入后是否回车
 	Reason     string `json:"reason"`     // AI 的思考说明
 }
 
@@ -309,14 +310,14 @@ func observeWeb(b *bgBrowser) (Observation, error) {
 			var e = els[i];
 			var r = e.getBoundingClientRect();
 			if (r.width===0 || r.height===0) continue;
-			var sel = e.id ? '#'+e.id : '';
-			if (!sel && e.name) sel = e.tagName.toLowerCase()+'[name="'+e.name+'"]';
-			if (!sel) { var cls=(e.className&&typeof e.className==='string')?e.className.trim().split(/\\s+/)[0]:''; sel = e.tagName.toLowerCase()+(cls?'.'+cls:''); }
-			var txt = (e.innerText||e.value||e.placeholder||e.getAttribute('aria-label')||'').trim().slice(0,60);
-			out.push((n+1)+'. '+e.tagName.toLowerCase()+' ['+sel+'] 文本="'+txt+'"');
+			e.setAttribute('data-nf', String(n+1));
+			var sel = 'data-nf="'+(n+1)+'"';
+			var txt = (e.innerText||e.value||e.placeholder||e.getAttribute('aria-label')||e.getAttribute('title')||'').trim().slice(0,60);
+			var sub = e.tagName.toLowerCase()==='input' && e.type && e.type!=='text' ? ' type='+e.type : '';
+			out.push((n+1)+'. '+e.tagName.toLowerCase()+sub+' ['+sel+'] 文本="'+txt+'"');
 			n++;
 		}
-		return out.join('\\n');
+		return out.join('\n');
 	})()`
 	if v, err := b.eval(js); err == nil {
 		obs.Elements, _ = v.(string)
@@ -387,13 +388,24 @@ func executeAIAction(a AIAction, b *bgBrowser, cfg AIConfig) error {
 	case "input":
 		// 带 window → 桌面控件赋值；否则走网页
 		if strings.TrimSpace(a.Window) != "" || strings.TrimSpace(a.AutoID) != "" {
-			_, err := uiaSetValue(a.Window, firstNonEmpty(a.Name, a.AutoID), a.AutoID, a.Text)
-			return err
+			if _, err := uiaSetValue(a.Window, firstNonEmpty(a.Name, a.AutoID), a.AutoID, a.Text); err != nil {
+				return err
+			}
+			if a.Enter {
+				return uiaPressEnter(a.Window)
+			}
+			return nil
 		}
 		if b == nil {
 			return errors.New("后台浏览器未启动")
 		}
-		return b.inputText(a.Selector, a.Text)
+		if err := b.inputText(a.Selector, a.Text); err != nil {
+			return err
+		}
+		if a.Enter {
+			return b.pressEnter()
+		}
+		return nil
 	case "download":
 		if b == nil {
 			return errors.New("后台浏览器未启动")
@@ -403,7 +415,8 @@ func executeAIAction(a AIAction, b *bgBrowser, cfg AIConfig) error {
 			return err
 		}
 		if a.Selector != "" {
-			_, err := b.downloadByClick(currentURL(b), a.Selector, a.File, a.Seconds)
+			// 已在当前页面，不重新导航（传空 url）
+			_, err := b.downloadByClick("", a.Selector, a.File, a.Seconds)
 			return err
 		}
 		return errors.New("下载动作缺少 url 或 selector")
@@ -446,6 +459,28 @@ func currentURL(b *bgBrowser) string {
 
 // ---------- 主循环：AI 自主完成任务 ----------
 
+// planner 决策器：云端多模态模型或本地语义引擎都实现它
+type planner interface {
+	plan(instruction string, obs Observation, history []AIAction) (AIAction, error)
+}
+
+// useLocalEngine 判断是否走本地引擎（无需 API）
+func useLocalEngine(cfg AIConfig) bool {
+	p := strings.ToLower(strings.TrimSpace(cfg.Provider))
+	return p == "" || p == "local" || p == "本地" || p == "local-semantic"
+}
+
+func newPlanner(instruction string, cfg AIConfig, window string) (planner, error) {
+	if useLocalEngine(cfg) {
+		return newLocalPlanner(instruction, window), nil
+	}
+	client, err := newAIClient(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("%v；也可以在设置里切换到「本地智能引擎」，无需 API", err)
+	}
+	return client, nil
+}
+
 type AIProgress struct {
 	Step    int      `json:"step"`
 	Total   int      `json:"total"`
@@ -457,7 +492,7 @@ type AIProgress struct {
 // mode: "web"（网页）或 "desktop"（桌面软件）
 // onProgress 为进度回调，可为 nil
 func runAIAgent(instruction string, cfg AIConfig, browserPath, downloadDir, window string, mode string, onProgress func(AIProgress)) error {
-	client, err := newAIClient(cfg)
+	pl, err := newPlanner(instruction, cfg, window)
 	if err != nil {
 		return err
 	}
@@ -487,7 +522,7 @@ func runAIAgent(instruction string, cfg AIConfig, browserPath, downloadDir, wind
 			return fmt.Errorf("第 %d 步观察失败：%v", step, err)
 		}
 
-		action, err := client.plan(instruction, obs, history)
+		action, err := pl.plan(instruction, obs, history)
 		if err != nil {
 			return fmt.Errorf("第 %d 步 AI 决策失败：%v", step, err)
 		}
@@ -514,6 +549,9 @@ func runAIAgent(instruction string, cfg AIConfig, browserPath, downloadDir, wind
 // ---------- 连接测试 ----------
 
 func testAIConnection(cfg AIConfig) (string, error) {
+	if useLocalEngine(cfg) {
+		return "本地智能引擎已就绪：无需联网、无需 API Key", nil
+	}
 	client, err := newAIClient(cfg)
 	if err != nil {
 		return "", err

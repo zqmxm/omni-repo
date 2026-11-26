@@ -98,6 +98,30 @@ if ($el.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern,
 	})
 }
 
+// uiaPressEnter 桌面版"回车"：不发送系统按键，而是直接调用窗口里的默认按钮
+// （IsDefaultButton 或名称为 确定/搜索/提交/OK 的按钮），保持后台不占键鼠
+func uiaPressEnter(title string) error {
+	script := uiaFindHeader + `
+$all = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
+$names = @('确定','确认','搜索','提交','OK','Ok','Search','Submit','查询','立即搜索')
+$target = $null
+foreach ($el in $all) {
+  try {
+    if ($el.Current.ControlType.ProgrammaticName -ne 'ControlType.Button') { continue }
+    if ($el.Current.IsDefaultButton) { $target = $el; break }
+    if ($names -contains $el.Current.Name) { $target = $el; break }
+  } catch {}
+}
+if ($null -eq $target) { Write-Output "未找到默认按钮，跳过回车"; exit 0 }
+$inv = $null
+if ($target.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern, [ref]$inv)) {
+  $inv.Invoke(); Write-Output ("已按下: " + $target.Current.Name)
+} else { Write-Output "默认按钮不支持 Invoke，跳过回车" }
+`
+	_, err := runPowerShell(script, map[string]string{"ZD_TITLE": title})
+	return err
+}
+
 // uiaSetValue 给输入框/编辑控件赋值，不发送按键
 func uiaSetValue(title, name, automationID, text string) (string, error) {
 	script := uiaFindHeader + uiaFindControl + `

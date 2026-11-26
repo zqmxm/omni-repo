@@ -51,7 +51,7 @@ func newServer() *Server {
 func (s *Server) loadConfig() {
 	data, err := os.ReadFile(s.cfgPath)
 	if err != nil {
-		s.cfg = AIConfig{Provider: "qwen-vl", MaxSteps: 12}
+		s.cfg = AIConfig{Provider: "local", MaxSteps: 12}
 		return
 	}
 	var c AIConfig
@@ -198,13 +198,11 @@ func (s *Server) routes() http.Handler {
 
 		dl := strings.TrimSpace(cfg.DownloadDir)
 		if dl == "" {
-			dl = os.Getenv("USERPROFILE")
-		}
-		if dl == "" {
-			dl = os.Getenv("HOME")
-		}
-		if dl != "" {
-			dl = filepath.Join(dl, "Downloads", "NeuralFlow")
+			// 未指定时默认到用户目录下的 Downloads/NeuralFlow
+			dl = firstNonEmpty(os.Getenv("USERPROFILE"), os.Getenv("HOME"))
+			if dl != "" {
+				dl = filepath.Join(dl, "Downloads", "NeuralFlow")
+			}
 		}
 
 		err := runAIAgent(req.Instruction, cfg, cfg.BrowserPath, dl, req.Window, req.Mode,
