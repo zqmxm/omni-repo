@@ -63,7 +63,7 @@ desktop/自动操作助手/
 Windows 本地双击 `build.bat`，或在 Linux/Mac 上执行 `bash build.sh`：
 
 ```
-go build -ldflags="-H=windowsgui -s -w" -o "dist/软件本名.exe" src/main.go
+go build -ldflags="-H=windowsgui -s -w" -o "dist/软件本名.exe" ./src
 ```
 
 CI 用 `actions/setup-go@v5` + `go test` + 上面的构建命令，参考 `.github/workflows/自动操作助手.yml`。

@@ -15,7 +15,11 @@ func TestDescribeActions(t *testing.T) {
 		{Action{Kind: "wheel", Delta: 120}, "滚轮 120"},
 		{Action{Kind: "wait", Delay: 1000}, "等待 1000 毫秒"},
 		{Action{Kind: "text", Text: "你好"}, "输入文本: 你好"},
-		{Action{Kind: "url", Text: "https://example.com"}, "打开网址: https://example.com"},
+		{Action{Kind: "url", Text: "https://example.com"}, "打开网址(前台): https://example.com"},
+		{Action{Kind: "webopen", Target: "https://example.com"}, "🌐 后台打开: https://example.com"},
+		{Action{Kind: "webclick", Target: "#download"}, "🌐 后台点击: #download"},
+		{Action{Kind: "webdownloadclick", Target: "https://example.com", Submit: "#dl", File: "D:/下载"}, "🌐 后台点击下载: https://example.com [#dl] → D:/下载"},
+		{Action{Kind: "webupload", Target: "input[type=file]", File: "D:/a.png"}, "🌐 后台上传: D:/a.png → input[type=file]"},
 	}
 	for _, c := range cases {
 		if got := describe(c.a); got != c.want {
@@ -30,6 +34,7 @@ func TestActionScriptRoundTrip(t *testing.T) {
 		{Kind: "ldown", X: 10, Y: 20, Delay: 100},
 		{Kind: "kdown", VK: 65, Delay: 50},
 		{Kind: "text", Text: "中文测试", Delay: 200},
+		{Kind: "webupload", Target: "input[type=file]", File: "D:/测试.png", Submit: "#go", Delay: 300},
 	}
 	data, err := json.Marshal(in)
 	if err != nil {

@@ -93,7 +93,7 @@ jobs:
         if: matrix.kind == 'go-exe'
         working-directory: ${{ matrix.dir }}
         shell: bash
-        run: go build -ldflags="-H=windowsgui -s -w" -o "${{ matrix.artifact }}" src/main.go
+        run: go build -ldflags="-H=windowsgui -s -w" -o "${{ matrix.artifact }}" ./src
 
       - name: 构建 Android APK
         if: matrix.kind == 'android'

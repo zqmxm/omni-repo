@@ -163,6 +163,18 @@ const (
 	idURLEdit = 1013
 	idList = 1014
 	idStatus = 1015
+	idSelEdit = 1016
+	idSaveDirEdit = 1017
+	idUploadEdit = 1018
+	idSubmitEdit = 1019
+	idTimeoutEdit = 1020
+	idBrowserEdit = 1021
+	idAddWebOpen = 1022
+	idAddWebClick = 1023
+	idAddWebInput = 1024
+	idAddWebDownload = 1025
+	idAddWebUpload = 1026
+	idWebURLEdit = 1027
 )
 
 // ===== 动作数据 =====
@@ -173,6 +185,10 @@ type Action struct {
 	VK int `json:"vk,omitempty"`
 	Delta int32 `json:"delta,omitempty"`
 	Text string `json:"text,omitempty"`
+	Target string `json:"target,omitempty"` // 网址或 CSS 选择器
+	File string `json:"file,omitempty"`     // 上传/下载保存路径
+	Submit string `json:"submit,omitempty"` // 上传后提交按钮选择器
+	Seconds int `json:"seconds,omitempty"`  // 下载超时秒数
 	Delay int64 `json:"delay"`
 }
 
@@ -180,6 +196,8 @@ var (
 	actions []Action
 	hwndMain uintptr
 	hList, hStatus, hLoopEdit, hTextEdit, hURLEdit uintptr
+	hSelEdit, hSaveDirEdit, hUploadEdit, hSubmitEdit, hTimeoutEdit, hBrowserEdit, hWebURLEdit uintptr
+	browserPathUsed string
 	hHookMouse, hHookKbd uintptr
 	recording atomic.Bool
 	playing atomic.Bool
@@ -230,9 +248,66 @@ func describe(a Action) string {
 	case "kup": return fmt.Sprintf("松开按键 [%s]", keyName(a.VK))
 	case "wait": return fmt.Sprintf("等待 %d 毫秒", a.Delay)
 	case "text": return "输入文本: " + a.Text
-	case "url": return "打开网址: " + a.Text
+	case "url": return "打开网址(前台): " + a.Text
+	case "webopen": return "🌐 后台打开: " + a.Target
+	case "webclick": return "🌐 后台点击: " + firstNonEmpty(a.Target, "文字="+a.Text)
+	case "webinput": return "🌐 后台填写: " + a.Target + " ← " + a.Text
+	case "webdownload": return "🌐 后台下载: " + a.Target + " → " + a.File
+	case "webdownloadclick": return "🌐 后台点击下载: " + a.Target + " [" + a.Submit + "] → " + a.File
+	case "webupload": return "🌐 后台上传: " + a.File + " → " + a.Target
+	case "webwait": return "🌐 后台等待 " + fmt.Sprintf("%d", a.Delay/1000) + " 秒"
 	}
 	return a.Kind
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if strings.TrimSpace(v) != "" { return v }
+	}
+	return ""
+}
+
+func addWebAction(kind string) {
+	url := strings.TrimSpace(getText(hWebURLEdit))
+	sel := strings.TrimSpace(getText(hSelEdit))
+	text := getText(hTextEdit)
+	saveDir := strings.TrimSpace(getText(hSaveDirEdit))
+	upload := strings.TrimSpace(getText(hUploadEdit))
+	submit := strings.TrimSpace(getText(hSubmitEdit))
+	secs := 60
+	fmt.Sscanf(getText(hTimeoutEdit), "%d", &secs)
+
+	a := Action{Kind: kind}
+	switch kind {
+	case "webopen":
+		if url == "" { setText(hStatus, "请先填写网址"); return }
+		a.Target = url
+	case "webclick":
+		if sel == "" && strings.TrimSpace(text) == "" { setText(hStatus, "请填写元素选择器或按钮文字"); return }
+		a.Target, a.Text = sel, text
+	case "webinput":
+		if sel == "" { setText(hStatus, "请填写输入框选择器"); return }
+		a.Target, a.Text = sel, text
+	case "webdownload":
+		if url == "" { setText(hStatus, "请填写下载地址"); return }
+		a.Target, a.File, a.Seconds = url, saveDir, secs
+		if sel != "" {
+			a.Kind = "webdownloadclick"
+			a.Submit = sel
+		}
+	case "webupload":
+		if sel == "" || upload == "" { setText(hStatus, "请填写上传控件选择器和文件路径"); return }
+		a.Target, a.File, a.Submit = sel, upload, submit
+	}
+	now := time.Now().UnixMilli()
+	d := now - lastRecordMS
+	if lastRecordMS == 0 { d = 0 }
+	if d > 3000 { d = 3000 }
+	lastRecordMS = now
+	a.Delay = d
+	actions = append(actions, a)
+	listAdd(describe(a))
+	setText(hStatus, "已添加：" + describe(a) + "（启动后后台执行，不占用鼠标键盘）")
 }
 
 func keyName(vk int) string {
@@ -333,11 +408,9 @@ next:
 
 func startRecord() {
 	if playing.Load() { return }
-	actions = nil
 	lastRecordMS, lastMoveMS = 0, 0
-	refreshList()
 	recording.Store(true)
-	setText(hStatus, "● 正在录制…（操作任意软件/浏览器；再按 F9 停止录制）")
+	setText(hStatus, "● 正在录制（动作追加到列表末尾；按 F9 停止）")
 }
 
 func stopRecord() {
@@ -403,12 +476,53 @@ func replay() {
 		}
 	}()
 	setText(hStatus, "▶ 正在自动运行…（按 F11 紧急停止）")
+	browserPathUsed = getText(hBrowserEdit)
+	var bg *bgBrowser
+	var bgDir string
+	ensureBG := func() error {
+		if bg != nil { return nil }
+		var err error
+		bgDir, err = os.MkdirTemp("", "zidongcaozuo-dl-")
+		if err != nil { return err }
+		bg, err = startBackgroundBrowser(browserPathUsed, bgDir)
+		return err
+	}
+	defer func() {
+		if bg != nil { bg.Close() }
+		if bgDir != "" { os.RemoveAll(bgDir) }
+	}()
 
 	for i := 0; (loops == 0 || i < loops) && !stopPlay.Load(); i++ {
 		for _, a := range actions {
 			if stopPlay.Load() { return }
 			if a.Delay > 0 && !sleepStop(a.Delay) { return }
+			if strings.HasPrefix(a.Kind, "web") && a.Kind != "webwait" {
+				if err := ensureBG(); err != nil {
+					setText(hStatus, "后台浏览器启动失败：" + err.Error())
+					return
+				}
+			}
+			var werr error
 			switch a.Kind {
+			case "webopen":
+				werr = bg.openURL(a.Target)
+			case "webclick":
+				werr = bg.click(a.Target, a.Text)
+			case "webinput":
+				werr = bg.inputText(a.Target, a.Text)
+			case "webdownload":
+				var saved string
+				saved, werr = bg.download(a.Target, a.File, a.Seconds)
+				if werr == nil { setText(hStatus, "后台下载完成：" + saved) }
+			case "webdownloadclick":
+				var saved string
+				saved, werr = bg.downloadByClick(a.Target, a.Submit, a.File, a.Seconds)
+				if werr == nil { setText(hStatus, "后台下载完成：" + saved) }
+			case "webupload":
+				werr = bg.upload(a.Target, a.File, a.Submit)
+				if werr == nil { setText(hStatus, "后台上传完成：" + a.File) }
+			case "webwait":
+				if !sleepStop(a.Delay) { return }
 			case "move":
 				pSetCursorPos.Call(uintptr(a.X), uintptr(a.Y))
 			case "ldown":
@@ -437,6 +551,10 @@ func replay() {
 				pShellExecute.Call(hwndMain, uintptr(unsafe.Pointer(utf16ptr("open"))),
 					uintptr(unsafe.Pointer(utf16ptr(a.Text))), 0, 0, swShowNormal)
 				time.Sleep(1200 * time.Millisecond)
+			}
+			if werr != nil {
+				setText(hStatus, "后台操作失败：" + werr.Error())
+				return
 			}
 		}
 		if loops == 0 || i < loops-1 {
@@ -502,6 +620,11 @@ func wndProc(hwnd uintptr, m uint32, wParam uintptr, lParam uintptr) uintptr {
 			if t == "" { setText(hStatus, "请先输入要写入的文本"); return 0 }
 			manualAction("text", t)
 			setText(hStatus, "已添加文本输入动作（回放时自动粘贴）")
+		case idAddWebOpen: addWebAction("webopen")
+		case idAddWebClick: addWebAction("webclick")
+		case idAddWebInput: addWebAction("webinput")
+		case idAddWebDownload: addWebAction("webdownload")
+		case idAddWebUpload: addWebAction("webupload")
 		case idAddURL:
 			u := strings.TrimSpace(getText(hURLEdit))
 			if u == "" { setText(hStatus, "请先输入网址"); return 0 }
@@ -571,9 +694,10 @@ func main() {
 		uintptr(unsafe.Pointer(utf16ptr("AutoOpsWindowClass"))),
 		uintptr(unsafe.Pointer(utf16ptr("自动操作助手 - 录制与循环回放"))),
 		0x00CF0000, // WS_OVERLAPPEDWINDOW
-		80, 60, 700, 560, 0, 0, hInst, 0)
+		80, 40, 700, 750, 0, 0, hInst, 0)
 
-	makeControl("Static", "使用说明：① 点「开始录制」或按 F9 → ② 在任意软件里操作一遍（支持鼠标、键盘、浏览器下载）→ ③ 按 F9 停止 → ④ 点「启动」自动重复。", 0, 16, 12, 660, 40, 0)
+	makeControl("Static", "推荐后台模式：填写网址/选择器 → 添加后台动作 → 点「启动」。全程独立浏览器，不占用鼠标键盘。", 0, 16, 10, 660, 22, 0)
+	makeControl("Static", "前台录制（可选）：F9 录制任意软件操作，再按 F10 重复；录制期间会占用键鼠。", 0, 16, 32, 660, 20, 0)
 	makeControl("Static", "全局热键：F9 录制/停止    F10 启动/停止    F11 紧急停止", 0, 16, 50, 660, 22, 0)
 
 	makeControl("Button", "开始录制(F9)", idRecord, 16, 80, 130, 32, wsTabStop)
@@ -597,9 +721,33 @@ func main() {
 	hURLEdit = makeControl("Edit", "", idURLEdit, 88, 196, 400, 28, wsBorder|wsTabStop|esAutoHScroll)
 	makeControl("Button", "添加网址动作", idAddURL, 498, 196, 176, 28, wsTabStop)
 
-	makeControl("Static", "动作列表：", 0, 16, 236, 100, 20, 0)
-	hList = makeControl("ListBox", "", idList, 16, 258, 658, 190, wsBorder|wsVScroll|lbsNotify|wsTabStop)
-	hStatus = makeControl("Static", "准备就绪。可先按 F9 录制一遍操作。", idStatus, 16, 458, 658, 52, 0)
+	makeControl("Static", "── 后台任务（网页自动化，不影响你使用电脑）──", 0, 16, 232, 660, 22, 0)
+	makeControl("Static", "后台网址:", 0, 16, 260, 70, 20, 0)
+	hWebURLEdit = makeControl("Edit", "", idWebURLEdit, 96, 256, 330, 26, wsBorder|wsTabStop|esAutoHScroll)
+	makeControl("Button", "后台打开网址", idAddWebOpen, 434, 256, 240, 26, wsTabStop)
+	makeControl("Static", "元素选择器:", 0, 16, 294, 80, 20, 0)
+	makeControl("Static", "保存目录:", 0, 16, 328, 70, 20, 0)
+	makeControl("Static", "上传文件:", 0, 16, 362, 70, 20, 0)
+	makeControl("Static", "提交按钮:", 0, 16, 396, 70, 20, 0)
+	makeControl("Static", "浏览器路径:", 0, 16, 430, 80, 20, 0)
+
+	hSelEdit = makeControl("Edit", "", idSelEdit, 96, 290, 330, 26, wsBorder|wsTabStop|esAutoHScroll)
+	makeControl("Button", "后台点击", idAddWebClick, 434, 290, 110, 26, wsTabStop)
+	makeControl("Button", "后台填写", idAddWebInput, 552, 290, 122, 26, wsTabStop)
+	hSaveDirEdit = makeControl("Edit", "", idSaveDirEdit, 96, 324, 330, 26, wsBorder|wsTabStop|esAutoHScroll)
+	makeControl("Button", "后台下载", idAddWebDownload, 434, 324, 110, 26, wsTabStop)
+	makeControl("Static", "超时秒:", 0, 550, 328, 50, 20, 0)
+	hTimeoutEdit = makeControl("Edit", "60", idTimeoutEdit, 606, 324, 68, 26, wsBorder|wsTabStop|esAutoHScroll)
+	hUploadEdit = makeControl("Edit", "", idUploadEdit, 96, 358, 330, 26, wsBorder|wsTabStop|esAutoHScroll)
+	makeControl("Button", "后台上传", idAddWebUpload, 434, 358, 240, 26, wsTabStop)
+	hSubmitEdit = makeControl("Edit", "", idSubmitEdit, 96, 392, 578, 26, wsBorder|wsTabStop|esAutoHScroll)
+	hBrowserEdit = makeControl("Edit", "", idBrowserEdit, 96, 426, 330, 26, wsBorder|wsTabStop|esAutoHScroll)
+	makeControl("Static", "留空自动检测 Chrome / Edge", 0, 434, 430, 240, 20, 0)
+	makeControl("Static", "元素选择器同时用于：后台点击 / 后台填写 / 后台上传。示例：#download、a.download、input[type=file]", 0, 16, 456, 660, 20, 0)
+
+	makeControl("Static", "动作列表：", 0, 16, 480, 100, 20, 0)
+	hList = makeControl("ListBox", "", idList, 16, 502, 658, 170, wsBorder|wsVScroll|lbsNotify|wsTabStop)
+	hStatus = makeControl("Static", "准备就绪。后台任务请用上方按钮添加；前台录制用 F9。", idStatus, 16, 680, 658, 56, 0)
 
 	// 脚本自动保存到 exe 同目录
 	exe, err := os.Executable()
