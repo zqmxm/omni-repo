@@ -2,6 +2,15 @@ name: CI
 
 on:
   push:
+    paths:
+      - "python/**"
+      - "node/**"
+      - "web/**"
+      - "desktop/*/src/**"
+      - "desktop/*/tests/**"
+      - "android/*/app/src/**"
+      - "android/*/自检/**"
+      - ".github/workflows/ci.yml"
   pull_request:
   workflow_dispatch:
 
