@@ -11,7 +11,7 @@
 | `ci.yml` | 每次上传代码都跑一遍检查，确认没写错 |
 | `android.yml` | 自动把最小安卓模板打包成 APK 安装包 |
 | `自动抠图.yml` | 专门负责检查算法、把「自动抠图」打包成 `自动抠图.apk` |
-| `auto-backup.yml` | 读 `build-manifest.json` 清单，自动打包软件并存到 GitHub Releases（不覆盖旧版本） |
+| `auto-backup.yml` | 读 `build-manifest.json` 清单，自动打包软件并更新 GitHub Releases 固定版（只保留最新版） |
 | `透明橡皮擦.yml` | 专门负责把「透明橡皮擦」打包成 Windows exe |
 | `README.md` | 就是这份说明 |
 

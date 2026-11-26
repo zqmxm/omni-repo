@@ -42,11 +42,12 @@
   所以必须额外上传上面这种带中文显示名的源码包来满足命名要求。
 - Release **标题**、**tag**、**仓库目录**、**本地产物文件**同样全部用中文软件本名。
 
-- **Release tag / 名称 / 备份标识 = 软件本名**：`透明橡皮擦-v1.0.0-<时间戳>`，
+- **Release tag = 软件本名 + `-latest`，固定不变**：`透明橡皮擦-latest`；每次更新覆盖同一个 Release，**GitHub 上只保留最新版**。
   `omni.py publish --name 透明橡皮擦`，`build-manifest.json` 的 `name`/`dir`/`artifact` 全部用本名。
 - **workflow 文件名也用软件本名**：`desktop/透明橡皮擦/` 对应 `.github/workflows/透明橡皮擦.yml`。
 - **生成的文件一律用中文名**：本地生成的源码包叫 `透明橡皮擦源码.zip`，用户下载到本地的文件叫
   `透明橡皮擦 v1.0.0.exe` —— 让用户保存下来的文件一眼就知道是什么，绝不留英文代号文件名。
+- **不保留旧版本**：源码的 git 历史照常保留（可查旧代码），但 GitHub Release 始终只有一个最新版；`publish` 会自动覆盖同名 Release、删掉旧附件和历史 Release。
 - 只允许的例外：平台根目录（`python/` `desktop/` 等）和通用脚本目录保持小写英文（被代码/CI 引用）；
   软件名本身不含空格，也不含 `/ \ : * ? " < > |` 等系统保留字符。
 - 每个项目目录**必须**自带 `README.md`，写清：功能、怎么运行、依赖、怎么测试、怎么出包
@@ -75,7 +76,7 @@
 1. **源码**：放在 `<平台目录>/<软件本名>/` 下，至少要有实现功能的源代码文件、`README.md`、`VERSION`。
    源码必须提交进仓库（由 `omni.py publish` 自动同步）。
 2. **成品文件**：必须是一个真实存在、可双击运行或可安装的 **`*.exe`**（Windows）或 **`*.apk`**（Android），
-   上传到该版本的 GitHub Release，显示名用软件本名。**不接受只交源码包、`.py`/`.js` 脚本、网页链接或构建命令当成品。**
+   上传到该软件的固定 Release（`<软件本名>-latest`），显示名用软件本名。**不接受只交源码包、`.py`/`.js` 脚本、网页链接或构建命令当成品。**
 
 - Python / Web / Node / Go / Rust / Java / Flutter / 小程序等：目标是 Windows 就必须用 PyInstaller 等打成 `exe`；
   目标是 Android 就必须用 Gradle 打出 `apk`。
@@ -106,7 +107,7 @@
 - Windows exe：PyInstaller 6.x，构建放到 `windows-latest` runner
 - 注释和文档默认**中文**（与仓库所有者语言一致）
 
-## 5. 交付必做：备份到 GitHub（不覆盖旧版本）
+## 5. 交付必做：备份到 GitHub（只保留最新版）
 
 **每个软件做完并产出 exe/apk 可执行文件后，必须备份。** 这是本仓库的核心能力，详见 `BACKUP_GUIDE.md`。
 **源码 + exe/apk 成品缺一不可**：没有成品不允许交付，没有源码也不允许交付。
@@ -115,8 +116,8 @@
   `python scripts/omni.py publish --name <软件本名> --artifact <产物路径>`
   （`<软件本名>` 必须是软件的真实名字，中文软件就传中文，例如 `--name 透明橡皮擦`；
   脚本会自动用这个名字命名仓库目录、Release tag 和产物资产，绝不用英文代号）
-- 每个版本生成**独立的 Release**，tag 带版本号和时间戳，**永不覆盖旧版本**
-- 源码走仓库目录（每次新 commit + VERSION 文件递增），产物 exe/apk 走 Release（不入库，避开 100MB 限制）
+- 每个软件**只保留一个 Release**：tag 固定为 `<软件本名>-latest`，更新时覆盖内容、删除旧附件和历史 Release
+- 源码走仓库目录（每次新 commit + VERSION 文件递增），产物 exe/apk 走这个固定 Release（不入库，避开 100MB 限制）
 - **脚本强制校验**：`--artifact` 必须是 `.exe` 或 `.apk`，项目目录里必须有源码文件；传 zip/脚本/网页或空目录会直接报错，不许绕过
 - 若产物由 CI 构建：在 `build-manifest.json` 加一条配置，`auto-backup.yml` 会自动构建并备份，无需手工上传
 - 用户无需登录 GitHub 网页：Token 一次配置（`python scripts/omni.py auth --token <PAT>`）后存在本机仓库外
@@ -131,13 +132,13 @@
 - ❌ 引入需要付费账号、私有 API、特定 AI 平台插件才能运行的依赖
 - ❌ 修改或删除别的项目目录里的内容
 - ❌ 写「能破解/绕过/移除他人版权保护」的功能
-- ❌ 覆盖已有版本的 Release 或产物——永远新增版本
+- ❌ 在 GitHub 上堆积旧版本 Release / 旧附件——更新时覆盖同一个 Release，只保留最新版
 
 ## 7. CI 约定
 
 - `ci.yml`：每次 push 跑 Python 单测 / Node 冒烟 / Web 存在性，必须保持绿
 - `android.yml`：仅 `android/**` 或自身改动时触发，产出 `app-debug.apk` artifact
-- `auto-backup.yml`：读 `build-manifest.json`，自动构建 exe/apk 并创建独立 Release（不覆盖）
+- `auto-backup.yml`：读 `build-manifest.json`，自动构建 exe/apk 并更新该软件的固定 Release（只留最新版）
 - 新增 workflow 一律加 `workflow_dispatch:` 方便手动重跑
 - 构建失败时如实报告，不要假装成功；本机跑不了的工具链（Android SDK / Windows）交给 CI
 

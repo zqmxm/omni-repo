@@ -29,7 +29,7 @@
 2. 打开仓库 → **Actions** → 左边选 **自动抠图** → 点最近一次运行 → 拉到页面底部 **Artifacts** → 下载 **自动抠图**
 3. 解压得到 `自动抠图.apk`，传到手机，点安装（系统会让打开「允许未知来源」，允许即可）
 
-另外 `.github/workflows/auto-backup.yml` 读到 `build-manifest.json` 里的这条配置后，会自动建一个独立 Release 备份，也可以去 **Releases** 页签下载，旧版本不会被覆盖。
+另外 `.github/workflows/auto-backup.yml` 读到 `build-manifest.json` 里的这条配置后，会自动更新固定 Release（自动抠图-latest），也可以去 **Releases** 页签下载，只保留最新版。
 
 这是 **debug APK**，自己装着自己用没问题；要上架应用商店还需要你自己的签名 keystore、应用图标和隐私政策，仓库里绝不放密钥。
 

@@ -316,6 +316,53 @@ def sync_source(token: str, message: str) -> str:
 
 # ---------- Release ----------
 
+def find_release_by_tag(token: str, tag: str):
+    """按 tag 查找 Release；不存在返回 None。"""
+    owner, repo = get_repo()
+    safe = urllib.parse.quote(tag, safe="")
+    try:
+        data, _ = api("GET", f"/repos/{owner}/{repo}/releases/tags/{safe}", token)
+        return data
+    except OmniError as exc:
+        if "HTTP 404" in str(exc):
+            return None
+        raise
+
+
+def delete_release_assets(token: str, release: dict) -> None:
+    """删除某个 Release 下的所有旧附件。"""
+    owner, repo = get_repo()
+    for asset in release.get("assets", []):
+        api("DELETE", f"/repos/{owner}/{repo}/releases/assets/{asset['id']}", token)
+
+
+def upsert_release(token: str, tag: str, name: str, body: str) -> dict:
+    """同一个软件始终更新同一个 Release，不保留旧版本。"""
+    owner, repo = get_repo()
+    existing = find_release_by_tag(token, tag)
+    if existing:
+        api("PATCH", f"/repos/{owner}/{repo}/releases/{existing['id']}", token, data={
+            "name": name, "body": body, "draft": False, "prerelease": False,
+        })
+        delete_release_assets(token, existing)
+        return existing
+    return create_release(token, tag, name, body)
+
+
+def delete_old_releases(token: str, name: str, keep_tag: str) -> int:
+    """删除该软件除 keep_tag 外的所有历史 Release（源码 git 历史仍保留）。"""
+    owner, repo = get_repo()
+    count = 0
+    for r in list_releases(token):
+        tag = r["tag_name"]
+        if tag == keep_tag:
+            continue
+        if tag == name + "-latest" or tag.startswith(name + "-v"):
+            api("DELETE", f"/repos/{owner}/{repo}/releases/{r['id']}", token)
+            count += 1
+    return count
+
+
 def create_release(token: str, tag: str, name: str, body: str) -> dict:
     owner, repo = get_repo()
     data, _ = api("POST", f"/repos/{owner}/{repo}/releases", token, data={
@@ -400,7 +447,8 @@ def list_releases(token: str, name: str | None = None) -> list[dict]:
             break
         page += 1
     if name:
-        out = [r for r in out if r["tag_name"].startswith(name + "-v")]
+        out = [r for r in out
+               if r["tag_name"] == name + "-latest" or r["tag_name"].startswith(name + "-v")]
     return out
 
 
@@ -424,6 +472,8 @@ def download_asset(token: str, tag: str, dest: Path, asset_name: str | None = No
     # 下载到本地用中文名：优先用中文显示名(label) + Release 版本，
     # 让用户保存下来的文件一眼就知道是什么。GitHub 上存的 ASCII 名不暴露给用户。
     m = re.search(r"-v(\d+\.\d+\.\d+)", tag)
+    if not m:
+        m = re.search(r"v(\d+\.\d+\.\d+)", releases.get("name", ""))
     ver = m.group(1) if m else ""
     label = chosen.get("label") or ""
     suffix = Path(chosen["name"]).suffix or ""
@@ -484,23 +534,25 @@ def publish(token: str, name: str, artifact: Path, bump: str = "patch",
     new_version = version or bump_version(current, bump)
     write_version(project, new_version)
 
-    stamp = timestamp_tag()
-    tag = f"{name}-v{new_version}-{stamp}"
+    tag = f"{name}-latest"
     ascii_name = _ascii_name(name)
 
     commit_sha = sync_source(token, f"backup({name}): v{new_version} 源码与构建脚本")
 
-    release = create_release(
+    release = upsert_release(
         token, tag, f"{name} v{new_version}",
         f"## {name} v{new_version}\n\n"
         f"- 源码提交：`{commit_sha[:7]}`\n"
         f"- 生成时间：{_dt.datetime.now().isoformat(timespec='seconds')}\n"
-        f"- 任何 AI 产出的版本都会新增一个 Release，不会覆盖旧版本。\n",
+        f"- 只保留最新版每次更新会覆盖同一个 Release（{tag}），旧版本不保留。\n",
     )
 
     # 1) 可执行文件：文件名用 ASCII，显示名用软件本名
-    exe_file = f"{ascii_name}-v{new_version}-{platform_label(artifact)}{artifact.suffix}"
+    exe_file = f"{ascii_name}-{platform_label(artifact)}{artifact.suffix}"
     asset = upload_asset(token, release["upload_url"], artifact, name, exe_file)
+
+    # 清掉该软件的历史 Release，GitHub 上只看得到最新版
+    deleted = delete_old_releases(token, name, tag)
 
     # 2) 源码压缩包：显示名「<软件本名>源码」
     source_label = f"{name}源码"
@@ -508,7 +560,7 @@ def publish(token: str, name: str, artifact: Path, bump: str = "patch",
     try:
         src_asset = upload_asset(
             token, release["upload_url"], source_zip, source_label,
-            f"{ascii_name}-source-v{new_version}.zip",
+            f"{ascii_name}-source.zip",
         )
     except OmniError:
         src_asset = None  # 源码包上传失败不影响主产物
@@ -519,4 +571,5 @@ def publish(token: str, name: str, artifact: Path, bump: str = "patch",
         "asset": asset["name"], "asset_label": asset.get("label", name),
         "asset_url": asset["browser_download_url"], "size": asset["size"],
         "source_asset": src_asset["name"] if src_asset else None,
+        "deleted_old_releases": deleted,
     }

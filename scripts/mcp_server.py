@@ -32,7 +32,7 @@ import omni_lib as lib
 TOOLS = [
     {
         "name": "omni_publish",
-        "description": "把 AI 做好的软件备份到 GitHub：源码提交 + exe/apk 成品上传到独立 Release。强制校验源码存在且产物为 .exe 或 .apk，缺一不可；每个版本不覆盖旧版本。",
+        "description": "把 AI 做好的软件备份到 GitHub：源码提交 + exe/apk 成品上传到固定 Release（软件名-latest）。强制校验源码存在且产物为 .exe 或 .apk，缺一不可；只保留最新版。",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -101,7 +101,7 @@ def call_tool(name: str, arguments: dict) -> dict:
                 f"备份完成：{result['name']} v{result['version']}\n"
                 f"Release：{result['release_url']}\n"
                 f"产物：{result['asset']}（{result['size']} 字节）\n"
-                f"旧版本未被覆盖。"
+                f"旧版本已清理，只保留最新版。"
             )
         if name == "omni_list":
             releases = lib.list_releases(token, arguments.get("name"))

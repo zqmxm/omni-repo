@@ -14,7 +14,8 @@
       "dir": "desktop/透明橡皮擦",
       "kind": "python-exe",
       "artifact": "透明橡皮擦.exe",
-      "runner": "windows-latest"
+      "runner": "windows-latest",
+      "ascii_name": "toumingxiangpicao"
     },
     {
       "name": "自动抠图",

@@ -33,7 +33,7 @@ cd omni-repo
 | `scripts/` | 通用脚手架 + 备份工具 | ✅ `new_project.py` / `omni.py` / `mcp_server.py` |
 | `data/` | 样例数据、配置、素材 | 占位，按需放 |
 | `go/` `rust/` `java/` `flutter/` `miniapp/` | 其他语言 / 端 | 按需新建，规则见 AGENTS.md |
-| `BACKUP_GUIDE.md` | **自动备份系统规范** | ✅ 版本化 / 不覆盖 / 对话内上传下载 |
+| `BACKUP_GUIDE.md` | **自动备份系统规范** | ✅ 只保留最新版 / 对话内上传下载 |
 | `build-manifest.json` | **自动构建备份清单** | ✅ 加一行即自动出包备份 |
 
 **三条铁律**：
@@ -43,7 +43,7 @@ cd omni-repo
 
 ---
 
-## 备份系统：每个软件都存到 GitHub，永不覆盖
+## 备份系统：每个软件都存到 GitHub，只保留最新版
 
 这是本仓库的核心能力，详见 [BACKUP_GUIDE.md](BACKUP_GUIDE.md)。
 
@@ -54,9 +54,9 @@ python scripts/omni.py list                                 # 列出所有历史
 python scripts/omni.py download --tag <tag>                 # 下载任意版本的 exe
 ```
 
-- **源码**进仓库目录（新 commit + VERSION 递增），**产物**进独立 Release（不受 100MB 限制）
+- **源码**进仓库目录（新 commit + VERSION 递增），**产物**进该软件固定的 `<软件名>-latest` Release（不受 100MB 限制）
 - **强制交付**：`--artifact` 只接受 `.exe` 或 `.apk`，项目目录必须有真实源码；zip/脚本/网页/空目录会被拒绝，不能只交一半
-- 每做一个新版本就**新增一个 Release**，旧版本永久保留，绝不覆盖
+- 每个软件**只保留一个 Release**：更新时覆盖旧附件并删除历史 Release，GitHub 上永远只有最新版
 - 支持 MCP 的 AI 注册 `scripts/mcp_server.py` 后，可**在对话框里直接上传/下载 exe**，不用打开 GitHub（配置见 `mcp-config.example.json`）
 - CI 构建的产物：在 `build-manifest.json` 加一行，`auto-backup.yml` 自动打包并备份
 
@@ -71,7 +71,7 @@ python scripts/omni.py download --tag <tag>                 # 下载任意版本
 | `自动抠图.yml` | `android/自动抠图/**` 改动或手动 | 算法自检 + `自动抠图.apk` artifact |
 | `透明橡皮擦.yml` | 透明橡皮擦改动或手动 | 透明橡皮擦.exe artifact |
 | `自动操作助手.yml` | `desktop/自动操作助手/**` 改动或手动 | 自检 + `自动操作助手.exe` artifact |
-| `auto-backup.yml` | 清单/源码改动或手动 | **自动构建 + 独立 Release 备份（不覆盖）** |
+| `auto-backup.yml` | 清单/源码改动或手动 | **自动构建 + 更新固定 Release（只留最新版）** |
 
 产物在仓库 → **Actions** → 对应工作流 → Artifacts，或 **Releases** 页签直接下载。
 

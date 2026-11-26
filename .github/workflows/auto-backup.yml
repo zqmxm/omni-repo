@@ -1,7 +1,7 @@
 name: Auto Backup (通用自动备份)
 
 # 任何 AI 新增软件后，只需在 build-manifest.json 里加一条配置，
-# 本工作流会自动构建 exe/apk 并创建 Release，永不覆盖旧版本。
+# 本工作流会自动构建 exe/apk 并更新固定 Release，只保留最新版。
 # 也可在 Actions 页面手动触发并选择软件。
 
 on:
@@ -144,10 +144,36 @@ jobs:
           NEXT="$MAJOR.$MINOR.$((PATCH+1))"
           echo "$NEXT" > "$VF"
           echo "version=$NEXT" >> "$GITHUB_OUTPUT"
-          STAMP=$(date +%Y%m%d-%H%M)
-          echo "tag=${{ matrix.name }}-v${NEXT}-${STAMP}" >> "$GITHUB_OUTPUT"
+          echo "tag=${{ matrix.name }}-latest" >> "$GITHUB_OUTPUT"
 
-      - name: 创建 Release 并上传产物（新增，不覆盖）
+      - name: 统一为最新版资产文件名
+        id: stable
+        shell: bash
+        run: |
+          EXT="${{ matrix.artifact }}"
+          EXT="${EXT##*.}"
+          ASSET="${{ matrix.ascii_name || 'app' }}-latest.$EXT"
+          cp "${{ steps.artifact.outputs.path }}" "$ASSET"
+          echo "path=$ASSET" >> "$GITHUB_OUTPUT"
+
+      - name: 删除该软件的历史 Release（只留最新版）
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const name = '${{ matrix.name }}';
+            const keep = name + '-latest';
+            const rels = await github.paginate(github.rest.repos.listReleases, {
+              owner: context.repo.owner, repo: context.repo.repo, per_page: 100,
+            });
+            for (const r of rels) {
+              if (r.tag_name !== keep && r.tag_name.startsWith(name + '-v')) {
+                await github.rest.repos.deleteRelease({
+                  owner: context.repo.owner, repo: context.repo.repo, release_id: r.id,
+                });
+              }
+            }
+
+      - name: 更新固定 Release 并上传最新版产物
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
@@ -156,9 +182,10 @@ jobs:
             ## ${{ matrix.name }} v${{ steps.ver.outputs.version }}
 
             - 由 GitHub Actions 自动构建并备份
-            - 每次构建生成独立 Release，旧版本不会被覆盖
+            - 只保留最新版：每次更新覆盖同一个 Release，旧版本会删除
             - 源码随本次 commit 一同保留在仓库
-          files: ${{ steps.artifact.outputs.path }}
+          files: ${{ steps.stable.outputs.path }}
+          overwrite_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

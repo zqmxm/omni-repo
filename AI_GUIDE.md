@@ -69,7 +69,7 @@
 
 ## 自动备份：做完软件直接存到 GitHub
 
-本仓库已内置备份系统，任何 AI 做完软件后都能把源码和 exe/apk 存到 GitHub，**每个版本独立保留、永不覆盖旧版本**。详见 `BACKUP_GUIDE.md`。
+本仓库已内置备份系统，任何 AI 做完软件后都能把源码和 exe/apk 存到 GitHub，**每个软件只保留最新版，更新时覆盖同一个 Release**。详见 `BACKUP_GUIDE.md`。
 
 **一次配置**（任何 AI 帮你做，或你自己跑一次）：
 ```bash
@@ -87,7 +87,7 @@ python scripts/omni.py download --tag <tag>    # 下载某个版本的 exe
 **在 AI 对话框里直接上传/下载**（无需打开 GitHub）：
 把 `scripts/mcp_server.py` 注册为 MCP 工具（配置模板见 `mcp-config.example.json`），AI 就能直接调用 `omni_publish` / `omni_list` / `omni_download`。支持 MCP 的 Cursor、Claude Desktop、WorkBuddy 等都可用。
 
-**CI 自动备份**：产物由 GitHub Actions 构建时，在 `build-manifest.json` 加一条配置，`auto-backup.yml` 会自动打包并创建独立 Release，连命令都不用敲。
+**CI 自动备份**：产物由 GitHub Actions 构建时，在 `build-manifest.json` 加一条配置，`auto-backup.yml` 会自动打包并更新固定 Release，连命令都不用敲。
 
 ## 换 AI 时不会丢的东西
 
