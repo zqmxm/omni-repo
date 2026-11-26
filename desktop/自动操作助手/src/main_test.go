@@ -20,6 +20,8 @@ func TestDescribeActions(t *testing.T) {
 		{Action{Kind: "webclick", Target: "#download"}, "🌐 后台点击: #download"},
 		{Action{Kind: "webdownloadclick", Target: "https://example.com", Submit: "#dl", File: "D:/下载"}, "🌐 后台点击下载: https://example.com [#dl] → D:/下载"},
 		{Action{Kind: "webupload", Target: "input[type=file]", File: "D:/a.png"}, "🌐 后台上传: D:/a.png → input[type=file]"},
+		{Action{Kind: "winclick", Target: "记事本", Name: "保存"}, "🖥 后台点击控件: 保存 @ 记事本"},
+		{Action{Kind: "wininput", Target: "打开", AutoID: "1148", Text: "D:/test.png"}, "🖥 后台填写控件: 自动化ID=1148 ← D:/test.png"},
 	}
 	for _, c := range cases {
 		if got := describe(c.a); got != c.want {

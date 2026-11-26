@@ -175,6 +175,15 @@ const (
 	idAddWebDownload = 1025
 	idAddWebUpload = 1026
 	idWebURLEdit = 1027
+	idWinTitle = 1028
+	idWinName = 1029
+	idWinAID = 1030
+	idWinText = 1031
+	idAppPath = 1032
+	idWinTest = 1033
+	idWinClick = 1034
+	idWinInput = 1035
+	idWinLaunch = 1036
 )
 
 // ===== 动作数据 =====
@@ -185,7 +194,9 @@ type Action struct {
 	VK int `json:"vk,omitempty"`
 	Delta int32 `json:"delta,omitempty"`
 	Text string `json:"text,omitempty"`
-	Target string `json:"target,omitempty"` // 网址或 CSS 选择器
+	Target string `json:"target,omitempty"` // 网址、CSS 选择器或窗口标题关键词
+	Name string `json:"name,omitempty"`    // 桌面控件名称
+	AutoID string `json:"autoid,omitempty"` // 桌面控件自动化 ID
 	File string `json:"file,omitempty"`     // 上传/下载保存路径
 	Submit string `json:"submit,omitempty"` // 上传后提交按钮选择器
 	Seconds int `json:"seconds,omitempty"`  // 下载超时秒数
@@ -197,6 +208,7 @@ var (
 	hwndMain uintptr
 	hList, hStatus, hLoopEdit, hTextEdit, hURLEdit uintptr
 	hSelEdit, hSaveDirEdit, hUploadEdit, hSubmitEdit, hTimeoutEdit, hBrowserEdit, hWebURLEdit uintptr
+	hWinTitleEdit, hWinNameEdit, hWinAIDEdit, hWinTextEdit, hAppPathEdit uintptr
 	browserPathUsed string
 	hHookMouse, hHookKbd uintptr
 	recording atomic.Bool
@@ -256,6 +268,9 @@ func describe(a Action) string {
 	case "webdownloadclick": return "🌐 后台点击下载: " + a.Target + " [" + a.Submit + "] → " + a.File
 	case "webupload": return "🌐 后台上传: " + a.File + " → " + a.Target
 	case "webwait": return "🌐 后台等待 " + fmt.Sprintf("%d", a.Delay/1000) + " 秒"
+	case "winclick": return "🖥 后台点击控件: " + firstNonEmpty(a.Name, "自动化ID="+a.AutoID) + " @ " + a.Target
+	case "wininput": return "🖥 后台填写控件: " + firstNonEmpty(a.Name, "自动化ID="+a.AutoID) + " ← " + a.Text
+	case "winlaunch": return "🖥 后台启动程序: " + a.File
 	}
 	return a.Kind
 }
@@ -265,6 +280,36 @@ func firstNonEmpty(vals ...string) string {
 		if strings.TrimSpace(v) != "" { return v }
 	}
 	return ""
+}
+
+func addDesktopAction(kind string) {
+	title := strings.TrimSpace(getText(hWinTitleEdit))
+	name := strings.TrimSpace(getText(hWinNameEdit))
+	aid := strings.TrimSpace(getText(hWinAIDEdit))
+	text := getText(hWinTextEdit)
+	app := strings.TrimSpace(getText(hAppPathEdit))
+	a := Action{Kind: kind, Target: title, Name: name, AutoID: aid, Text: text, File: app}
+	if kind == "winclick" && (title == "" || (name == "" && aid == "")) {
+		setText(hStatus, "请填写窗口标题关键词，以及控件名称或自动化ID")
+		return
+	}
+	if kind == "wininput" && (title == "" || (name == "" && aid == "")) {
+		setText(hStatus, "请填写窗口标题关键词和要操作的控件")
+		return
+	}
+	if kind == "winlaunch" && app == "" {
+		setText(hStatus, "请填写程序路径")
+		return
+	}
+	now := time.Now().UnixMilli()
+	d := now - lastRecordMS
+	if lastRecordMS == 0 { d = 0 }
+	if d > 3000 { d = 3000 }
+	lastRecordMS = now
+	a.Delay = d
+	actions = append(actions, a)
+	listAdd(describe(a))
+	setText(hStatus, "已添加：" + describe(a))
 }
 
 func addWebAction(kind string) {
@@ -523,6 +568,18 @@ func replay() {
 				if werr == nil { setText(hStatus, "后台上传完成：" + a.File) }
 			case "webwait":
 				if !sleepStop(a.Delay) { return }
+			case "winclick":
+				var msg string
+				msg, werr = uiaInvoke(a.Target, a.Name, a.AutoID)
+				if werr == nil { setText(hStatus, "桌面操作：" + msg) }
+			case "wininput":
+				var msg string
+				msg, werr = uiaSetValue(a.Target, a.Name, a.AutoID, a.Text)
+				if werr == nil { setText(hStatus, "桌面操作：" + msg) }
+			case "winlaunch":
+				var msg string
+				msg, werr = uiaLaunch(a.File)
+				if werr == nil { setText(hStatus, "桌面操作：" + msg) }
 			case "move":
 				pSetCursorPos.Call(uintptr(a.X), uintptr(a.Y))
 			case "ldown":
@@ -620,6 +677,15 @@ func wndProc(hwnd uintptr, m uint32, wParam uintptr, lParam uintptr) uintptr {
 			if t == "" { setText(hStatus, "请先输入要写入的文本"); return 0 }
 			manualAction("text", t)
 			setText(hStatus, "已添加文本输入动作（回放时自动粘贴）")
+		case idWinTest:
+			title := strings.TrimSpace(getText(hWinTitleEdit))
+			go func() {
+				msg, err := uiaTestWindow(title)
+				if err != nil { setText(hStatus, "窗口测试失败：" + msg) } else { setText(hStatus, msg) }
+			}()
+		case idWinClick: addDesktopAction("winclick")
+		case idWinInput: addDesktopAction("wininput")
+		case idWinLaunch: addDesktopAction("winlaunch")
 		case idAddWebOpen: addWebAction("webopen")
 		case idAddWebClick: addWebAction("webclick")
 		case idAddWebInput: addWebAction("webinput")
@@ -694,7 +760,7 @@ func main() {
 		uintptr(unsafe.Pointer(utf16ptr("AutoOpsWindowClass"))),
 		uintptr(unsafe.Pointer(utf16ptr("自动操作助手 - 录制与循环回放"))),
 		0x00CF0000, // WS_OVERLAPPEDWINDOW
-		80, 40, 700, 750, 0, 0, hInst, 0)
+		80, 30, 700, 920, 0, 0, hInst, 0)
 
 	makeControl("Static", "推荐后台模式：填写网址/选择器 → 添加后台动作 → 点「启动」。全程独立浏览器，不占用鼠标键盘。", 0, 16, 10, 660, 22, 0)
 	makeControl("Static", "前台录制（可选）：F9 录制任意软件操作，再按 F10 重复；录制期间会占用键鼠。", 0, 16, 32, 660, 20, 0)
@@ -745,9 +811,26 @@ func main() {
 	makeControl("Static", "留空自动检测 Chrome / Edge", 0, 434, 430, 240, 20, 0)
 	makeControl("Static", "元素选择器同时用于：后台点击 / 后台填写 / 后台上传。示例：#download、a.download、input[type=file]", 0, 16, 456, 660, 20, 0)
 
-	makeControl("Static", "动作列表：", 0, 16, 480, 100, 20, 0)
-	hList = makeControl("ListBox", "", idList, 16, 502, 658, 170, wsBorder|wsVScroll|lbsNotify|wsTabStop)
-	hStatus = makeControl("Static", "准备就绪。后台任务请用上方按钮添加；前台录制用 F9。", idStatus, 16, 680, 658, 56, 0)
+	makeControl("Static", "── 桌面软件后台控制（UI 自动化，不占用鼠标键盘）──", 0, 16, 480, 660, 22, 0)
+	makeControl("Static", "窗口标题:", 0, 16, 508, 70, 20, 0)
+	hWinTitleEdit = makeControl("Edit", "", idWinTitle, 96, 504, 330, 26, wsBorder|wsTabStop|esAutoHScroll)
+	makeControl("Button", "测试窗口", idWinTest, 434, 504, 240, 26, wsTabStop)
+	makeControl("Static", "控件名称:", 0, 16, 542, 70, 20, 0)
+	hWinNameEdit = makeControl("Edit", "", idWinName, 96, 538, 330, 26, wsBorder|wsTabStop|esAutoHScroll)
+	makeControl("Static", "自动化ID:", 0, 434, 542, 70, 20, 0)
+	hWinAIDEdit = makeControl("Edit", "", idWinAID, 508, 538, 166, 26, wsBorder|wsTabStop|esAutoHScroll)
+	makeControl("Static", "输入内容:", 0, 16, 576, 70, 20, 0)
+	hWinTextEdit = makeControl("Edit", "", idWinText, 96, 572, 330, 26, wsBorder|wsTabStop|esAutoHScroll)
+	makeControl("Button", "填写控件", idWinInput, 434, 572, 110, 26, wsTabStop)
+	makeControl("Button", "点击控件", idWinClick, 552, 572, 122, 26, wsTabStop)
+	makeControl("Static", "程序路径:", 0, 16, 610, 70, 20, 0)
+	hAppPathEdit = makeControl("Edit", "", idAppPath, 96, 606, 330, 26, wsBorder|wsTabStop|esAutoHScroll)
+	makeControl("Button", "启动程序", idWinLaunch, 434, 606, 240, 26, wsTabStop)
+	makeControl("Static", "先填窗口标题关键词并点「测试窗口」确认；控件名称/自动化ID 可用 Windows SDK 的 Inspect 工具查看。", 0, 16, 638, 660, 20, 0)
+
+	makeControl("Static", "动作列表：", 0, 16, 664, 100, 20, 0)
+	hList = makeControl("ListBox", "", idList, 16, 686, 658, 160, wsBorder|wsVScroll|lbsNotify|wsTabStop)
+	hStatus = makeControl("Static", "准备就绪。网页用后台任务区；桌面软件用 UI 自动化区。", idStatus, 16, 854, 658, 56, 0)
 
 	// 脚本自动保存到 exe 同目录
 	exe, err := os.Executable()
