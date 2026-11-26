@@ -282,6 +282,11 @@ func serveWeb() error {
 		Handler:           s.routes(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
+	// 把控制台地址写到 exe 同目录，浏览器没自动弹出时可手动打开
+	if dir := filepath.Dir(s.cfgPath); dir != "" {
+		_ = os.WriteFile(filepath.Join(dir, "neuralflow-url.txt"),
+			[]byte("\ufeffNeuralFlow 控制台正在运行，如果浏览器没有自动打开，\r\n请复制下面的地址到浏览器地址栏：\r\n\r\n"+consoleURL+"\r\n"), 0644)
+	}
 	go openBrowser(consoleURL) // 监听成功后再打开浏览器，避免打开一个打不开的页面
 	return srv.Serve(ln)
 }
