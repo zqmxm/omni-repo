@@ -156,7 +156,7 @@ jobs:
         run: |
           EXT="${{ matrix.artifact }}"
           EXT="${EXT##*.}"
-          ASSET="${{ matrix.ascii_name || 'app' }}-latest.$EXT"
+          ASSET="${{ matrix.name }}.$EXT"
           cp "${{ steps.artifact.outputs.path }}" "$ASSET"
           echo "path=$ASSET" >> "$GITHUB_OUTPUT"
 
@@ -175,6 +175,23 @@ jobs:
                   owner: context.repo.owner, repo: context.repo.repo, release_id: r.id,
                 });
               }
+            }
+
+      - name: 清理当前 Release 的旧资产（避免中文名与旧名并存）
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = '${{ matrix.name }}-latest';
+            let rel;
+            try {
+              rel = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner, repo: context.repo.repo, tag,
+              });
+            } catch (e) { return; }
+            for (const a of rel.data.assets) {
+              await github.rest.repos.deleteReleaseAsset({
+                owner: context.repo.owner, repo: context.repo.repo, asset_id: a.id,
+              });
             }
 
       - name: 更新固定 Release 并上传最新版产物
