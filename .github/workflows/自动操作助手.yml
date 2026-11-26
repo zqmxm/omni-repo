@@ -1,0 +1,32 @@
+name: 构建自动操作助手 EXE
+
+on:
+  push:
+    paths:
+      - "desktop/自动操作助手/**"
+      - ".github/workflows/自动操作助手.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+      - name: 自检
+        working-directory: desktop/自动操作助手
+        run: go test ./src -v
+      - name: 打包 exe
+        working-directory: desktop/自动操作助手
+        run: go build -ldflags="-H=windowsgui -s -w" -o "dist/自动操作助手.exe" src/main.go
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: 自动操作助手-Windows-x64
+          path: desktop/自动操作助手/dist/自动操作助手.exe
+          if-no-files-found: error

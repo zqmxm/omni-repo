@@ -48,6 +48,26 @@ jobs:
 
 打 tag 时想发到 Releases，再加一个 `softprops/action-gh-release@v2` 步骤即可。
 
+## Go → exe 配方（无第三方依赖，可交叉编译）
+
+```
+desktop/自动操作助手/
+├── README.md
+├── VERSION
+├── src/main.go
+├── src/main_test.go
+├── build.bat（Windows 本地打包）
+└── build.sh（Linux/Mac 交叉编译）
+```
+
+Windows 本地双击 `build.bat`，或在 Linux/Mac 上执行 `bash build.sh`：
+
+```
+go build -ldflags="-H=windowsgui -s -w" -o "dist/软件本名.exe" src/main.go
+```
+
+CI 用 `actions/setup-go@v5` + `go test` + 上面的构建命令，参考 `.github/workflows/自动操作助手.yml`。
+
 ## 规则
 
 - `*.exe` / `*.msi` / `build/` / `dist/` **不入库**，一律走 Artifact / Release

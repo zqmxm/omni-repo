@@ -4,7 +4,7 @@
   "_字段": {
     "name": "软件本名（软件叫什么就写什么，支持中文，如 透明橡皮擦）",
     "dir": "项目目录（相对仓库根，与 name 同名）",
-    "kind": "python-exe | android | node | web",
+    "kind": "python-exe | go-exe | android | node | web",
     "artifact": "产物文件名或相对路径（用软件名，如 透明橡皮擦.exe）",
     "runner": "可选，windows-latest 或 ubuntu-latest"
   },
@@ -23,6 +23,14 @@
       "artifact": "自动抠图.apk",
       "runner": "ubuntu-latest",
       "ascii_name": "zidongkoutu"
+    },
+    {
+      "name": "自动操作助手",
+      "dir": "desktop/自动操作助手",
+      "kind": "go-exe",
+      "artifact": "自动操作助手.exe",
+      "runner": "windows-latest",
+      "ascii_name": "zidongcaozuozhushou"
     }
   ]
 }

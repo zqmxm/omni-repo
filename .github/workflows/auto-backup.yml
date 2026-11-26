@@ -77,6 +77,24 @@ jobs:
         if: matrix.kind == 'python-exe'
         run: python "${{ matrix.dir }}/build.py"
 
+      - name: Go 环境（Go 桌面软件需要）
+        if: matrix.kind == 'go-exe'
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+
+      - name: 自检 Go 软件
+        if: matrix.kind == 'go-exe'
+        working-directory: ${{ matrix.dir }}
+        shell: bash
+        run: go test ./src -v
+
+      - name: 构建 Go Windows exe
+        if: matrix.kind == 'go-exe'
+        working-directory: ${{ matrix.dir }}
+        shell: bash
+        run: go build -ldflags="-H=windowsgui -s -w" -o "${{ matrix.artifact }}" src/main.go
+
       - name: 构建 Android APK
         if: matrix.kind == 'android'
         uses: gradle/actions/setup-gradle@v3
