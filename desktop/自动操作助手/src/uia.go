@@ -132,3 +132,29 @@ func uiaLaunch(path string) (string, error) {
 	}
 	return "已启动程序: " + path, nil
 }
+
+// uiaDumpTree 导出窗口的可交互控件树，作为 AI 的“视觉”输入。
+// 只取有名称的控件，限制数量以控制 AI token 消耗。
+func uiaDumpTree(title string) (string, error) {
+	script := uiaFindHeader + `
+$all = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
+$n = 0
+$lines = New-Object System.Collections.Generic.List[string]
+foreach ($el in $all) {
+  if ($n -ge 80) { break }
+  try {
+    $nm = $el.Current.Name
+    $ct = $el.Current.ControlType.ProgrammaticName
+    $aid = $el.Current.AutomationId
+    if (-not $nm) { continue }
+    if ($ct -notmatch 'Button|Edit|ComboBox|CheckBox|RadioButton|ListItem|MenuItem|TabItem|Hyperlink|Text') { continue }
+    $txt = $nm.Substring(0, [Math]::Min(60, $nm.Length))
+    $lines.Add(("控件 " + ($n+1) + ": " + $ct + " 名称=""" + $txt + """ 自动化ID=""" + $aid + """"))
+    $n++
+  } catch {}
+}
+if ($n -eq 0) { Write-Output "未发现可交互控件（此软件可能自绘界面，请改用前台录制模式）"; exit 1 }
+Write-Output ($lines -join [Environment]::NewLine)
+`
+	return runPowerShell(script, map[string]string{"ZD_TITLE": title})
+}

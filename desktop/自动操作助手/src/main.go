@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"syscall"
@@ -739,119 +738,13 @@ func makeControl(class, text string, id int, x, y, w, h int, style uint32) uintp
 }
 
 func main() {
-	pSetProcessDPIAware.Call()
-	hInst, _, _ := kernel32.NewProc("GetModuleHandleW").Call(0)
-
-	wndProcCallback = syscall.NewCallback(wndProc)
-	kbdCallback = syscall.NewCallback(kbdProc)
-	mouseCallback = syscall.NewCallback(mouseProc)
-
-	cls := wndClassEx{
-		Size: uint32(unsafe.Sizeof(wndClassEx{})),
-		Style: 0x0002 | 0x0008, // CS_HREDRAW|CS_VREDRAW
-		WndProc: wndProcCallback,
-		Instance: hInst,
-		Background: 6, // COLOR_WINDOW
-		ClassName: utf16ptr("AutoOpsWindowClass"),
-	}
-	pRegisterClassEx.Call(uintptr(unsafe.Pointer(&cls)))
-
-	hwndMain, _, _ = pCreateWindowEx.Call(0,
-		uintptr(unsafe.Pointer(utf16ptr("AutoOpsWindowClass"))),
-		uintptr(unsafe.Pointer(utf16ptr("自动操作助手 - 录制与循环回放"))),
-		0x00CF0000, // WS_OVERLAPPEDWINDOW
-		80, 30, 700, 920, 0, 0, hInst, 0)
-
-	makeControl("Static", "推荐后台模式：填写网址/选择器 → 添加后台动作 → 点「启动」。全程独立浏览器，不占用鼠标键盘。", 0, 16, 10, 660, 22, 0)
-	makeControl("Static", "前台录制（可选）：F9 录制任意软件操作，再按 F10 重复；录制期间会占用键鼠。", 0, 16, 32, 660, 20, 0)
-	makeControl("Static", "全局热键：F9 录制/停止    F10 启动/停止    F11 紧急停止", 0, 16, 50, 660, 22, 0)
-
-	makeControl("Button", "开始录制(F9)", idRecord, 16, 80, 130, 32, wsTabStop)
-	makeControl("Button", "停止录制", idStopRec, 152, 80, 100, 32, wsTabStop)
-	makeControl("Button", "启动 ▶ (F10)", idPlay, 262, 80, 130, 32, wsTabStop)
-	makeControl("Button", "停止 ■ (F11)", idStopPlay, 398, 80, 130, 32, wsTabStop)
-	makeControl("Button", "保存脚本", idSave, 534, 80, 140, 32, wsTabStop)
-
-	makeControl("Button", "加载脚本", idLoad, 16, 120, 100, 30, wsTabStop)
-	makeControl("Button", "清空动作", idClear, 124, 120, 100, 30, wsTabStop)
-	makeControl("Button", "+等待1秒", idWait, 232, 120, 100, 30, wsTabStop)
-	makeControl("Static", "循环次数(0=无限):", 0, 350, 125, 140, 22, 0)
-	hLoopEdit = makeControl("Edit", "0", idLoopEdit, 490, 120, 60, 30, wsBorder|wsTabStop|esAutoHScroll)
-	makeControl("Static", "提示：填 3 表示重复 3 遍", 0, 560, 125, 130, 22, 0)
-
-	makeControl("Static", "输入文本:", 0, 16, 164, 70, 22, 0)
-	hTextEdit = makeControl("Edit", "", idTextEdit, 88, 160, 400, 28, wsBorder|wsTabStop|esAutoHScroll)
-	makeControl("Button", "添加文本动作", idAddText, 498, 160, 176, 28, wsTabStop)
-
-	makeControl("Static", "打开网址:", 0, 16, 200, 70, 22, 0)
-	hURLEdit = makeControl("Edit", "", idURLEdit, 88, 196, 400, 28, wsBorder|wsTabStop|esAutoHScroll)
-	makeControl("Button", "添加网址动作", idAddURL, 498, 196, 176, 28, wsTabStop)
-
-	makeControl("Static", "── 后台任务（网页自动化，不影响你使用电脑）──", 0, 16, 232, 660, 22, 0)
-	makeControl("Static", "后台网址:", 0, 16, 260, 70, 20, 0)
-	hWebURLEdit = makeControl("Edit", "", idWebURLEdit, 96, 256, 330, 26, wsBorder|wsTabStop|esAutoHScroll)
-	makeControl("Button", "后台打开网址", idAddWebOpen, 434, 256, 240, 26, wsTabStop)
-	makeControl("Static", "元素选择器:", 0, 16, 294, 80, 20, 0)
-	makeControl("Static", "保存目录:", 0, 16, 328, 70, 20, 0)
-	makeControl("Static", "上传文件:", 0, 16, 362, 70, 20, 0)
-	makeControl("Static", "提交按钮:", 0, 16, 396, 70, 20, 0)
-	makeControl("Static", "浏览器路径:", 0, 16, 430, 80, 20, 0)
-
-	hSelEdit = makeControl("Edit", "", idSelEdit, 96, 290, 330, 26, wsBorder|wsTabStop|esAutoHScroll)
-	makeControl("Button", "后台点击", idAddWebClick, 434, 290, 110, 26, wsTabStop)
-	makeControl("Button", "后台填写", idAddWebInput, 552, 290, 122, 26, wsTabStop)
-	hSaveDirEdit = makeControl("Edit", "", idSaveDirEdit, 96, 324, 330, 26, wsBorder|wsTabStop|esAutoHScroll)
-	makeControl("Button", "后台下载", idAddWebDownload, 434, 324, 110, 26, wsTabStop)
-	makeControl("Static", "超时秒:", 0, 550, 328, 50, 20, 0)
-	hTimeoutEdit = makeControl("Edit", "60", idTimeoutEdit, 606, 324, 68, 26, wsBorder|wsTabStop|esAutoHScroll)
-	hUploadEdit = makeControl("Edit", "", idUploadEdit, 96, 358, 330, 26, wsBorder|wsTabStop|esAutoHScroll)
-	makeControl("Button", "后台上传", idAddWebUpload, 434, 358, 240, 26, wsTabStop)
-	hSubmitEdit = makeControl("Edit", "", idSubmitEdit, 96, 392, 578, 26, wsBorder|wsTabStop|esAutoHScroll)
-	hBrowserEdit = makeControl("Edit", "", idBrowserEdit, 96, 426, 330, 26, wsBorder|wsTabStop|esAutoHScroll)
-	makeControl("Static", "留空自动检测 Chrome / Edge", 0, 434, 430, 240, 20, 0)
-	makeControl("Static", "元素选择器同时用于：后台点击 / 后台填写 / 后台上传。示例：#download、a.download、input[type=file]", 0, 16, 456, 660, 20, 0)
-
-	makeControl("Static", "── 桌面软件后台控制（UI 自动化，不占用鼠标键盘）──", 0, 16, 480, 660, 22, 0)
-	makeControl("Static", "窗口标题:", 0, 16, 508, 70, 20, 0)
-	hWinTitleEdit = makeControl("Edit", "", idWinTitle, 96, 504, 330, 26, wsBorder|wsTabStop|esAutoHScroll)
-	makeControl("Button", "测试窗口", idWinTest, 434, 504, 240, 26, wsTabStop)
-	makeControl("Static", "控件名称:", 0, 16, 542, 70, 20, 0)
-	hWinNameEdit = makeControl("Edit", "", idWinName, 96, 538, 330, 26, wsBorder|wsTabStop|esAutoHScroll)
-	makeControl("Static", "自动化ID:", 0, 434, 542, 70, 20, 0)
-	hWinAIDEdit = makeControl("Edit", "", idWinAID, 508, 538, 166, 26, wsBorder|wsTabStop|esAutoHScroll)
-	makeControl("Static", "输入内容:", 0, 16, 576, 70, 20, 0)
-	hWinTextEdit = makeControl("Edit", "", idWinText, 96, 572, 330, 26, wsBorder|wsTabStop|esAutoHScroll)
-	makeControl("Button", "填写控件", idWinInput, 434, 572, 110, 26, wsTabStop)
-	makeControl("Button", "点击控件", idWinClick, 552, 572, 122, 26, wsTabStop)
-	makeControl("Static", "程序路径:", 0, 16, 610, 70, 20, 0)
-	hAppPathEdit = makeControl("Edit", "", idAppPath, 96, 606, 330, 26, wsBorder|wsTabStop|esAutoHScroll)
-	makeControl("Button", "启动程序", idWinLaunch, 434, 606, 240, 26, wsTabStop)
-	makeControl("Static", "先填窗口标题关键词并点「测试窗口」确认；控件名称/自动化ID 可用 Windows SDK 的 Inspect 工具查看。", 0, 16, 638, 660, 20, 0)
-
-	makeControl("Static", "动作列表：", 0, 16, 664, 100, 20, 0)
-	hList = makeControl("ListBox", "", idList, 16, 686, 658, 160, wsBorder|wsVScroll|lbsNotify|wsTabStop)
-	hStatus = makeControl("Static", "准备就绪。网页用后台任务区；桌面软件用 UI 自动化区。", idStatus, 16, 854, 658, 56, 0)
-
-	// 脚本自动保存到 exe 同目录
-	exe, err := os.Executable()
-	if err == nil { scriptPath = filepath.Join(filepath.Dir(exe), "录制脚本.json") } else { scriptPath = "录制脚本.json" }
-
-	if scriptPath != "" { loadScript() }
-
-	pShowWindow.Call(hwndMain, swShow)
-	pUpdateWindow.Call(hwndMain)
-	pRegisterHotKey.Call(hwndMain, 1, 0, vkF9)
-	pRegisterHotKey.Call(hwndMain, 2, 0, vkF10)
-	pRegisterHotKey.Call(hwndMain, 3, 0, vkF11)
-
-	hHookKbd, _, _ = pSetWindowsHookEx.Call(whKeyboardLL, kbdCallback, hInst, 0)
-	hHookMouse, _, _ = pSetWindowsHookEx.Call(whMouseLL, mouseCallback, hInst, 0)
-
-	var m msg
-	for {
-		ret, _, _ := pGetMessage.Call(uintptr(unsafe.Pointer(&m)), 0, 0, 0)
-		if int32(ret) <= 0 { break }
-		pTranslateMessage.Call(uintptr(unsafe.Pointer(&m)))
-		pDispatchMessage.Call(uintptr(unsafe.Pointer(&m)))
+	// NeuralFlow：现代化 AI 自动化控制台（Web Dashboard）
+	// 旧的 Win32 录制界面函数保留在源码中作为兼容参考，但默认入口为 Web 控制台。
+	if err := serveWeb(); err != nil {
+		// 服务启动失败时写日志到 exe 同目录
+		if f, e := os.OpenFile("neuralflow-error.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644); e == nil {
+			fmt.Fprintf(f, "%s 服务启动失败: %v\n", time.Now().Format(time.RFC3339), err)
+			f.Close()
+		}
 	}
 }
