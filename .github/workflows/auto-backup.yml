@@ -193,10 +193,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 提交版本号更新
+      - name: 提交版本号更新（带重试，避免并行构建互相冲突）
+        continue-on-error: true
+        shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "${{ matrix.dir }}/VERSION"
-          git commit -m "chore(${{ matrix.name }}): 版本更新至 v${{ steps.ver.outputs.version }}" || echo "无变更"
-          git push || echo "推送失败（无人值守时可忽略）"
+          for i in 1 2 3; do
+            git pull --rebase origin main || true
+            git add "${{ matrix.dir }}/VERSION"
+            if git diff --cached --quiet; then echo "VERSION 无变更，跳过"; break; fi
+            git commit -m "chore(${{ matrix.name }}): 版本更新至 v${{ steps.ver.outputs.version }}"
+            if git push origin HEAD:main; then echo "版本号提交成功"; break; fi
+            echo "第 $i 次推送冲突，重试…"
+            git reset --hard HEAD~1
+          done
