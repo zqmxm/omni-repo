@@ -1,6 +1,7 @@
 package main
 
 import (
+	"path/filepath"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -737,14 +738,40 @@ func makeControl(class, text string, id int, x, y, w, h int, style uint32) uintp
 	return hw
 }
 
+// showErrorBox 弹出系统错误框，让无窗口程序在失败时也能把原因告诉用户
+var pMessageBoxW = user32.NewProc("MessageBoxW")
+
+func showErrorBox(title, text string) {
+	t, _ := syscall.UTF16PtrFromString(text)
+	c, _ := syscall.UTF16PtrFromString(title)
+	pMessageBoxW.Call(0, uintptr(unsafe.Pointer(t)), uintptr(unsafe.Pointer(c)), 0x10) // MB_ICONERROR
+}
+
+// writeErrorLog 把启动失败原因写到 exe 同目录（带 BOM，记事本打开不乱码）；目录不可写时退到临时目录
+func writeErrorLog(msg string) {
+	path := "neuralflow-error.log"
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		path = filepath.Join(os.TempDir(), "neuralflow-error.log")
+		f, err = os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+		if err != nil {
+			return
+		}
+	}
+	defer f.Close()
+	if fi, e := f.Stat(); e == nil && fi.Size() == 0 {
+		f.WriteString("\ufeff") // UTF-8 BOM
+	}
+	f.WriteString(msg)
+}
+
 func main() {
-	// NeuralFlow：现代化 AI 自动化控制台（Web Dashboard）
+	// NeuralFlow：本地智能引擎自动化控制台（Web Dashboard）
 	// 旧的 Win32 录制界面函数保留在源码中作为兼容参考，但默认入口为 Web 控制台。
 	if err := serveWeb(); err != nil {
-		// 服务启动失败时写日志到 exe 同目录
-		if f, e := os.OpenFile("neuralflow-error.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644); e == nil {
-			fmt.Fprintf(f, "%s 服务启动失败: %v\n", time.Now().Format(time.RFC3339), err)
-			f.Close()
-		}
+		now := time.Now().Format("2006-01-02 15:04:05")
+		writeErrorLog(fmt.Sprintf("[%s] 服务启动失败: %v\r\n", now, err))
+		showErrorBox("自动操作助手 · NeuralFlow", fmt.Sprintf(
+			"控制台启动失败：\n%v\n\n请把这个提示截图发给开发者。\n（同目录 neuralflow-error.log 也记录了此信息）", err))
 	}
 }

@@ -10,10 +10,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
-	"os/exec"
+	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -232,19 +234,56 @@ func (s *Server) routes() http.Handler {
 }
 
 
+// consoleURL 记录控制台实际监听地址（端口被占用时会自动换端口）
+var consoleURL string
+
+const consolePort = "18760"
+
+// probeConsole 判断 127.0.0.1:port 上是否已经有我们自己的控制台在运行
+func probeConsole(port string) bool {
+	client := &http.Client{Timeout: 800 * time.Millisecond}
+	resp, err := client.Get("http://127.0.0.1:" + port + "/api/config")
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return false
+	}
+	var c AIConfig
+	return json.NewDecoder(resp.Body).Decode(&c) == nil
+}
+
 // 启动 Web 服务并打开浏览器
 func serveWeb() error {
 	s := newServer()
 	s.loadConfig()
-	port := "18760"
-	addr := "127.0.0.1:" + port
+
+	// 1) 已有控制台在运行（上次没关 / 重复双击）：直接打开它
+	if probeConsole(consolePort) {
+		consoleURL = "http://127.0.0.1:" + consolePort
+		openBrowser(consoleURL)
+		return nil
+	}
+
+	// 2) 首选 18760；被占用或被系统保留时自动换空闲端口
+	addr := "127.0.0.1:" + consolePort
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		ln, err = net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			return fmt.Errorf("无法监听本地端口：%w", err)
+		}
+		addr = "127.0.0.1:" + strconv.Itoa(ln.Addr().(*net.TCPAddr).Port)
+	}
+	consoleURL = "http://" + addr
+
 	srv := &http.Server{
-		Addr:              addr,
 		Handler:           s.routes(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-	go openBrowser("http://" + addr)
-	return srv.ListenAndServe()
+	go openBrowser(consoleURL) // 监听成功后再打开浏览器，避免打开一个打不开的页面
+	return srv.Serve(ln)
 }
 
 func openBrowser(url string) {
@@ -255,4 +294,3 @@ func openBrowser(url string) {
 	}
 	exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
 }
-
