@@ -1,0 +1,9 @@
+PySide6
+pymupdf
+python-docx
+openpyxl
+xlrd==2.0.1
+numpy
+onnxruntime
+pyinstaller
+pywin32

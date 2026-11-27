@@ -73,3 +73,14 @@ CI 用 `actions/setup-go@v5` + `go test` + 上面的构建命令，参考 `.gith
 - `*.exe` / `*.msi` / `build/` / `dist/` **不入库**，一律走 Artifact / Release
 - 源码、依赖清单、构建脚本、README 必须入库
 - 不要写死本机绝对路径；中文路径读写用 `Path` / Unicode-safe API
+
+## 本目录已有的软件（2026-11-28 新增两个）
+
+| 软件 | 目录 | 一句话说明 | 成品在哪 |
+| --- | --- | --- | --- |
+| 文件区域批量重命名 | `desktop/文件区域批量重命名/` | 从 PDF / Word / Excel 的固定位置读文字，给整批文件各自改名 | Releases → `文件区域批量重命名-latest` |
+| 夸克扫描王批量处理 | `desktop/夸克扫描王批量处理/` | 批量把 PDF 放进夸克扫描王、批量收回到指定文件夹 | Releases → `夸克扫描王批量处理-latest` |
+
+这两个都是**已经产出成品的归档**：源码在本目录，exe 只在 Release（仓库不收二进制）。成品含内置中文 OCR 模型 / 纯本地文件操作，CI 无法重建，所以没接 `build-manifest.json` 自动构建，也没加 workflow，后续更新直接覆盖固定 Release。
+
+两个目录里都有 `README.md`（怎么用、每个文件是什么）、`VERSION`、`CHECKSUMS.md`（成品校验值）。「夸克扫描王批量处理/历史版本/」放的是已作废的中间版源码，只备查，不要拿去编译。
