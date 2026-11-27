@@ -29,7 +29,7 @@ cd omni-repo
 | `web/` | 静态网页、单页小工具（零依赖，双击即开） | ✅ 带首页 |
 | `node/` | Node 服务、前端工程、构建脚本 | ✅ `node index.js` 可跑 |
 | `android/` | **Android 原生工程，CI 自动出 APK** | ✅ 最小 Gradle 工程 + 自动抠图（一键抠图 App） |
-| `desktop/` | Windows exe / 桌面应用源码与打包说明 | ✅ 说明 + 打包配方 + 透明橡皮擦 + 自动操作助手 |
+| `desktop/` | Windows exe / 桌面应用源码与打包说明 | ✅ 说明 + 打包配方 + 透明橡皮擦 + 自动操作助手 + 批量替换助手 |
 | `scripts/` | 通用脚手架 + 备份工具 | ✅ `new_project.py` / `omni.py` / `mcp_server.py` |
 | `data/` | 样例数据、配置、素材 | 占位，按需放 |
 | `go/` `rust/` `java/` `flutter/` `miniapp/` | 其他语言 / 端 | 按需新建，规则见 AGENTS.md |
@@ -71,6 +71,7 @@ python scripts/omni.py download --tag <tag>                 # 下载任意版本
 | `自动抠图.yml` | `android/自动抠图/**` 改动或手动 | 算法自检 + `自动抠图.apk` artifact |
 | `透明橡皮擦.yml` | 透明橡皮擦改动或手动 | 透明橡皮擦.exe artifact |
 | `自动操作助手.yml` | `desktop/自动操作助手/**` 改动或手动 | 自检 + `自动操作助手.exe` artifact |
+| `批量替换助手.yml` | `desktop/批量替换助手/**` 改动或手动 | 自检 + `批量替换助手.exe` artifact |
 | `auto-backup.yml` | 清单/源码改动或手动 | **自动构建 + 更新固定 Release（只留最新版）** |
 
 产物在仓库 → **Actions** → 对应工作流 → Artifacts，或 **Releases** 页签直接下载。

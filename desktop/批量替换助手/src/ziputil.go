@@ -1,0 +1,95 @@
+package main
+
+// ziputil.go —— ZIP（docx/xlsx 本质）保真复制与选择性重写（纯标准库）
+
+import (
+	"archive/zip"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+// transformFunc 接收条目原始文本，返回替换后的文本与命中次数
+type transformFunc func(content string) (string, int)
+
+// rewriteZipDynamic 与 rewriteZip 类似，但变换函数由条目名动态决定（返回 nil 表示原样复制）
+func rewriteZipDynamic(src, dst string, picker func(name string) transformFunc) (int, error) {
+	r, err := zip.OpenReader(src)
+	if err != nil {
+		return 0, fmt.Errorf("打开文档失败（可能损坏或加密）：%w", err)
+	}
+	defer r.Close()
+
+	dir := filepath.Dir(dst)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return 0, err
+	}
+	tmp, err := os.CreateTemp(dir, ".nf-replace-*.tmp")
+	if err != nil {
+		return 0, err
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath)
+
+	zw := zip.NewWriter(tmp)
+	total := 0
+	for _, f := range r.File {
+		tf := picker(f.Name)
+		if tf == nil {
+			if err := zw.Copy(f); err != nil {
+				tmp.Close()
+				return 0, fmt.Errorf("复制文档条目 %s 失败：%w", f.Name, err)
+			}
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			tmp.Close()
+			return 0, fmt.Errorf("读取文档条目 %s 失败：%w", f.Name, err)
+		}
+		data, err := io.ReadAll(rc)
+		rc.Close()
+		if err != nil {
+			tmp.Close()
+			return 0, err
+		}
+		newData, hits := tf(string(data))
+		total += hits
+		hdr := f.FileHeader
+		hdr.Method = f.Method
+		w, err := zw.CreateHeader(&hdr)
+		if err != nil {
+			tmp.Close()
+			return 0, err
+		}
+		if _, err := w.Write([]byte(newData)); err != nil {
+			tmp.Close()
+			return 0, err
+		}
+	}
+	if err := zw.Close(); err != nil {
+		tmp.Close()
+		return 0, fmt.Errorf("打包文档失败：%w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return 0, err
+	}
+	if info, err := os.Stat(src); err == nil {
+		_ = os.Chmod(tmpPath, info.Mode())
+	}
+	if err := os.Rename(tmpPath, dst); err != nil {
+		_ = os.Remove(dst)
+		if err2 := os.Rename(tmpPath, dst); err2 != nil {
+			return 0, fmt.Errorf("写回文档失败：%w", err2)
+		}
+	}
+	return total, nil
+}
+
+// normalizeEntryName 统一条目名：去掉大小写差异，便于匹配
+func normalizeEntryName(name string) string {
+	return strings.ToLower(strings.TrimPrefix(name, "/"))
+}
+
