@@ -76,6 +76,10 @@ func rewriteZipDynamic(src, dst string, picker func(name string) transformFunc) 
 	if err := tmp.Close(); err != nil {
 		return 0, err
 	}
+	// 写回前必须先关闭源 zip reader：Windows 不允许重命名/删除仍被打开的文件，
+	// 否则 os.Rename 会报 "Access is denied"（Linux 允许，故仅在 Windows 暴露）。
+	// 下方 defer r.Close() 仍保留作为错误路径兜底，重复 Close 是安全的。
+	_ = r.Close()
 	if info, err := os.Stat(src); err == nil {
 		_ = os.Chmod(tmpPath, info.Mode())
 	}
