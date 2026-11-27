@@ -1,6 +1,6 @@
 package main
 
-// main.go —— 程序入口：启动内嵌 Web 控制台
+// main.go —— 程序入口：启动原生桌面窗口（不再使用浏览器）
 
 import (
 	"fmt"
@@ -10,9 +10,9 @@ import (
 )
 
 func main() {
-	if err := serveWeb(); err != nil {
-		writeErrorLog(fmt.Sprintf("[%s] 服务启动失败: %v\r\n", time.Now().Format("2006-01-02 15:04:05"), err))
-		showErrorBox("批量替换助手", fmt.Sprintf("控制台启动失败：\n%v\n\n请把这个提示截图发给开发者。", err))
+	if err := runApp(); err != nil {
+		writeErrorLog(fmt.Sprintf("[%s] 窗口启动失败: %v\r\n", time.Now().Format("2006-01-02 15:04:05"), err))
+		showErrorBox("批量替换助手", fmt.Sprintf("启动失败：\n%v\n\n请把这个提示截图发给开发者。", err))
 	}
 }
 
