@@ -1,3 +1,10 @@
+> **备份规则 v2 · 永不覆盖（唯一权威说明）**：每次做完软件 / 每次 push 触发构建，
+> 都会**新增一个全局唯一的 Release**（tag = `<软件名>-v<版本>-<UTC时间戳>-<随机>`）。
+> 源码进 git 新 commit，成品 exe/apk 挂到这个新 Release。
+> **历史 Release、tag、附件一律不删除、不覆盖、不使用 `overwrite_files`**，
+> 任意一个旧版本都能用 `omni.py download --tag` 单独取回。
+> 唯一权威规范见 `BACKUP_GUIDE.md`；本文件其余章节若与本节冲突，以本节为准。
+
 # omni-repo · 万能软件仓库
 
 一个**不绑定语言、不绑定平台、也不绑定任何 AI** 的软件基地。
@@ -33,7 +40,7 @@ cd omni-repo
 | `scripts/` | 通用脚手架 + 备份工具 | ✅ `new_project.py` / `omni.py` / `mcp_server.py` |
 | `data/` | 样例数据、配置、素材 | 占位，按需放 |
 | `go/` `rust/` `java/` `flutter/` `miniapp/` | 其他语言 / 端 | 按需新建，规则见 AGENTS.md |
-| `BACKUP_GUIDE.md` | **自动备份系统规范** | ✅ 只保留最新版 / 对话内上传下载 |
+| `BACKUP_GUIDE.md` | **自动备份系统规范** | ✅ 每次新增、永不覆盖 / 对话内上传下载 |
 | `build-manifest.json` | **自动构建备份清单** | ✅ 加一行即自动出包备份 |
 
 **三条铁律**：
@@ -43,7 +50,7 @@ cd omni-repo
 
 ---
 
-## 备份系统：每个软件都存到 GitHub，只保留最新版
+## 备份系统：每个软件都存到 GitHub，每次新增、永不覆盖
 
 这是本仓库的核心能力，详见 [BACKUP_GUIDE.md](BACKUP_GUIDE.md)。
 
@@ -54,9 +61,9 @@ python scripts/omni.py list                                 # 列出所有历史
 python scripts/omni.py download --tag <tag>                 # 下载任意版本的 exe
 ```
 
-- **源码**进仓库目录（新 commit + VERSION 递增），**产物**进该软件固定的 `<软件名>-latest` Release（不受 100MB 限制）
+- **源码**进仓库目录（新 commit + VERSION 递增），**产物**进**本次新建的独立 Release**（唯一 tag，不受 100MB 限制）
 - **强制交付**：`--artifact` 只接受 `.exe` 或 `.apk`，项目目录必须有真实源码；zip/脚本/网页/空目录会被拒绝，不能只交一半
-- 每个软件**只保留一个 Release**：更新时覆盖旧附件并删除历史 Release，GitHub 上永远只有最新版
+- 每次备份**新增一个独立 Release**：历史 Release / tag / 附件全部保留，任何一个旧版本都能单独下载
 - 支持 MCP 的 AI 注册 `scripts/mcp_server.py` 后，可**在对话框里直接上传/下载 exe**，不用打开 GitHub（配置见 `mcp-config.example.json`）
 - CI 构建的产物：在 `build-manifest.json` 加一行，`auto-backup.yml` 自动打包并备份
 
@@ -72,7 +79,7 @@ python scripts/omni.py download --tag <tag>                 # 下载任意版本
 | `透明橡皮擦.yml` | 透明橡皮擦改动或手动 | 透明橡皮擦.exe artifact |
 | `自动操作助手.yml` | `desktop/自动操作助手/**` 改动或手动 | 自检 + `自动操作助手.exe` artifact |
 | `批量替换助手.yml` | `desktop/批量替换助手/**` 改动或手动 | 自检 + `批量替换助手.exe` / `批量替换助手-CLI.exe` artifact |
-| `auto-backup.yml` | 清单/源码改动或手动 | **自动构建 + 更新固定 Release（只留最新版）** |
+| `auto-backup.yml` | 清单/源码改动或手动 | **自动构建 + 新增独立 Release（永不覆盖）** |
 
 产物在仓库 → **Actions** → 对应工作流 → Artifacts，或 **Releases** 页签直接下载。
 

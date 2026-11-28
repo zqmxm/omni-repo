@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
@@ -28,6 +29,7 @@ type UndoEntry struct {
 
 // UndoOp 一次「开始替换」的完整动作集合
 type UndoOp struct {
+	ID      string      `json:"id,omitempty"` // v3.1.6：同一次「开始替换」的唯一 ID，用于增量落盘
 	Time    string      `json:"time"`
 	Dir     string      `json:"dir"`
 	SaveAs  string      `json:"saveAs,omitempty"`
@@ -144,6 +146,40 @@ func appendUndoOp(path string, op UndoOp) error {
 	}
 	op.Time = time.Now().Format("2006-01-02 15:04:05")
 	m.Ops = append(m.Ops, op)
+	for len(m.Ops) > maxUndoOps {
+		dropBackupFiles(m.Ops[0])
+		m.Ops = m.Ops[1:]
+	}
+	return saveManifest(path, m)
+}
+
+// upsertUndoOp 按 ID 写入/更新一次操作（v3.1.6）。
+// 同一次「开始替换」里每个文件完成后都会调用一次，全部共用同一个 ID，
+// 因此最终撤销栈里仍是单个完整 op；万一中途崩溃，manifest 里也已有
+// 已完成部分的记录，不会出现「文件改了却完全没法撤销」的孤儿备份。
+var undoWriteMu sync.Mutex
+
+func upsertUndoOp(path string, op UndoOp) error {
+	undoWriteMu.Lock()
+	defer undoWriteMu.Unlock()
+	m := &UndoManifest{}
+	if old, err := loadManifest(path); err == nil {
+		m = old
+	}
+	op.Time = time.Now().Format("2006-01-02 15:04:05")
+	replaced := false
+	if op.ID != "" {
+		for i := range m.Ops {
+			if m.Ops[i].ID == op.ID {
+				m.Ops[i] = op
+				replaced = true
+				break
+			}
+		}
+	}
+	if !replaced {
+		m.Ops = append(m.Ops, op)
+	}
 	for len(m.Ops) > maxUndoOps {
 		dropBackupFiles(m.Ops[0])
 		m.Ops = m.Ops[1:]

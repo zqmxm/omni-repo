@@ -40,8 +40,8 @@
       "artifact": "批量替换助手.exe",
       "runner": "windows-latest",
       "ascii_name": "piliangtihuanzhushou",
-      "manual_release": true
+      "cli_artifact": "批量替换助手-CLI.exe"
     }
   ],
-  "_手动归档说明": "manual_release=true 的软件：源码入库、专属 workflow 出 Artifact，但不进 auto-backup 矩阵；成品 exe 由人工核对后挂固定 Release"
+  "_备份规则": "v2 永不覆盖：每次 publish / 每次 push 触发 auto-backup 都生成全局唯一 tag，历史 Release 一律保留，不删不覆盖"
 }

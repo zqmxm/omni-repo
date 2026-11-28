@@ -104,6 +104,14 @@ func transformSpec(content string, pairs []Pair, spec textSpec) (string, int) {
 // replaceInContainer 聚合容器内所有文本节点，替换后写回第一个节点、清空其余。
 // 这样即使一句话被拆进多个 run，也能整句匹配；样式标签原样保留。
 func replaceInContainer(body string, pairs []Pair, re *regexp.Regexp) (string, int) {
+	// v3.1.6：段落里若还嵌着子段落（文本框 txbxContent / 形状文字 / SmartArt），
+	// 形如 (.*?)</w:p> 的正则会提前在内层 </w:p> 收尾，把正文和框内文字聚到一起，
+	// 替换后其余 run 被清空 → 格式归并、内容丢失。
+	// 这时降级为逐节点替换：不聚合、不清空其余 run，宁可跨 run 不命中也不毁格式。
+	if strings.Contains(body, "<w:p") || strings.Contains(body, "<a:p") ||
+		strings.Contains(body, "<w:txbxContent") {
+		return replaceFlat(body, pairs, re)
+	}
 	locs := re.FindAllStringSubmatchIndex(body, -1)
 	if len(locs) == 0 {
 		return body, 0

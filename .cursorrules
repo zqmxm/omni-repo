@@ -1,3 +1,10 @@
+> **备份规则 v2 · 永不覆盖（唯一权威说明）**：每次做完软件 / 每次 push 触发构建，
+> 都会**新增一个全局唯一的 Release**（tag = `<软件名>-v<版本>-<UTC时间戳>-<随机>`）。
+> 源码进 git 新 commit，成品 exe/apk 挂到这个新 Release。
+> **历史 Release、tag、附件一律不删除、不覆盖、不使用 `overwrite_files`**，
+> 任意一个旧版本都能用 `omni.py download --tag` 单独取回。
+> 唯一权威规范见 `BACKUP_GUIDE.md`；本文件其余章节若与本节冲突，以本节为准。
+
 本仓库的唯一权威规则是根目录 AGENTS.md，动手前先读它，再读 AI_GUIDE.md。
 
 核心约定：

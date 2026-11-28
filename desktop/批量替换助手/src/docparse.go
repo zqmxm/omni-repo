@@ -260,7 +260,9 @@ func replaceDocText(path string, pairs []Pair) (int, error) {
 		}
 	}
 	newBytes := []byte(buf.String())
-	utf16Len := len([]rune(newText))
+	// v3.1.6：ccpText 按 UTF-16 代码单元计数，不是 rune 数。
+	// 含 emoji / 生僻字（代理对）时 rune 数会偏小，Word 可能只读到半截。
+	utf16Len := len(utf16.Encode([]rune(newText)))
 
 	// 追加到 WordDocument 流末尾（对齐到 2 字节）
 	wd := info.word

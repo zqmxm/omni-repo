@@ -1,3 +1,10 @@
+> **备份规则 v2 · 永不覆盖（唯一权威说明）**：每次做完软件 / 每次 push 触发构建，
+> 都会**新增一个全局唯一的 Release**（tag = `<软件名>-v<版本>-<UTC时间戳>-<随机>`）。
+> 源码进 git 新 commit，成品 exe/apk 挂到这个新 Release。
+> **历史 Release、tag、附件一律不删除、不覆盖、不使用 `overwrite_files`**，
+> 任意一个旧版本都能用 `omni.py download --tag` 单独取回。
+> 唯一权威规范见 `BACKUP_GUIDE.md`；本文件其余章节若与本节冲突，以本节为准。
+
 # GitHub Copilot 指令
 
 本仓库的唯一权威规则是根目录 **`AGENTS.md`**，请先完整阅读再生成代码；跨 AI 使用说明见 `AI_GUIDE.md`。
@@ -13,6 +20,6 @@
 - 不提交密钥、keystore、*.exe、*.apk、node_modules、build 产物
 - 不引入绑定特定 AI 平台的私有依赖
 - 新增 workflow 要带路径过滤 + `workflow_dispatch`
-- **做完软件必须备份**：`python scripts/omni.py publish --name <名> --artifact <产物>`，每个软件只保留一个 Release（软件名-latest），更新时覆盖，不保留旧版本，详见 `BACKUP_GUIDE.md`
+- **做完软件必须备份**：`python scripts/omni.py publish --name <名> --artifact <产物>`，每次新增独立 Release、历史全部保留、永不覆盖，详见 `BACKUP_GUIDE.md`
 
 交付时说明改了哪些文件、怎么运行、怎么测试、Release 备份链接在哪、有什么边界。

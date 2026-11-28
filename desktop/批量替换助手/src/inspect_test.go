@@ -12,8 +12,20 @@ import (
 	"piliangtihuanzhushou/internal/mscfb"
 )
 
+// requireTestdata 真实 .doc/.xls 二进制样本不入库（体积与版权原因）。
+// 缺样本时跳过，避免 CI 长期挂红；纯逻辑与 OOXML 用例不依赖样本。
+func requireTestdata(t *testing.T, paths ...string) {
+	t.Helper()
+	for _, p := range paths {
+		if _, err := os.Stat(p); err != nil {
+			t.Skipf("缺少真实样本 %s（testdata/ 不入库），跳过：%v", p, err)
+		}
+	}
+}
+
 // TestInspectDoc 检查真实 .doc 样本的结构（开发期调试用）
 func TestInspectDoc(t *testing.T) {
+	requireTestdata(t, "../testdata/test.doc", "../testdata/novpapplan.doc")
 	for _, path := range []string{"../testdata/test.doc", "../testdata/novpapplan.doc"} {
 		f, err := os.Open(path)
 		if err != nil {
@@ -61,6 +73,7 @@ func rd32(b []byte, off int) uint32 {
 }
 
 func TestExtractDocText(t *testing.T) {
+	requireTestdata(t, "../testdata/test.doc", "../testdata/novpapplan.doc")
 	for _, path := range []string{"../testdata/test.doc", "../testdata/novpapplan.doc"} {
 		info, err := parseDocInfo(path)
 		if err != nil {
@@ -83,6 +96,7 @@ func TestExtractDocText(t *testing.T) {
 }
 
 func TestOleRoundTrip(t *testing.T) {
+	requireTestdata(t, "../testdata/test.doc", "../testdata/novpapplan.doc")
 	for _, path := range []string{"../testdata/test.doc", "../testdata/novpapplan.doc"} {
 		entries, err := readAllOLEStreams(path)
 		if err != nil {
@@ -125,6 +139,7 @@ func TestOleRoundTrip(t *testing.T) {
 }
 
 func TestReplaceDocText(t *testing.T) {
+	requireTestdata(t, "../testdata/novpapplan.doc")
 	src := "../testdata/novpapplan.doc"
 	info, err := parseDocInfo(src)
 	if err != nil {
@@ -176,6 +191,7 @@ func TestReplaceDocText(t *testing.T) {
 }
 
 func TestReplaceXlsText(t *testing.T) {
+	requireTestdata(t, "../testdata/test.xls")
 	src := "../testdata/test.xls"
 	entries, err := readAllOLEStreams(src)
 	if err != nil {

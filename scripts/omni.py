@@ -2,7 +2,7 @@
 """omni-repo 备份总控 CLI。
 
 任何 AI 做完软件后，只需一条命令即可把源码和 exe/apk 成品备份到 GitHub，
-且每个软件只保留最新版，更新时覆盖同一个 Release。
+每次都会【新增一个独立 Release】，历史版本全部保留，永不覆盖、永不删除。
 
 交付铁律（强制）：源码 + exe/apk 缺一不可。--artifact 只接受 .exe 或 .apk，
 项目目录必须有真实源码；否则 publish 直接报错，不许只交一半。
@@ -43,7 +43,7 @@ def cmd_publish(args):
         version=args.version, project_dir=project,
     )
     print(json.dumps(result, ensure_ascii=False, indent=2))
-    print("\n备份完成：源码已入库，产物已更新到最新版 Release，旧版本已清理。")
+    print("\n备份完成：源码已入库，产物已挂到全新的独立 Release；历史版本全部保留（永不覆盖）。")
 
 
 def cmd_list(args):
@@ -81,7 +81,7 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--token", required=True, help="有 repo 权限的 Personal Access Token")
     a.set_defaults(func=cmd_auth)
 
-    b = sub.add_parser("publish", help="备份源码 + exe/apk 成品；更新同一个 Release，只保留最新版")
+    b = sub.add_parser("publish", help="备份源码 + exe/apk 成品；新增独立 Release，永不覆盖历史")
     b.add_argument("--name", required=True, help="软件本名（中文软件就传中文），对应平台目录下的同名子目录")
     b.add_argument("--artifact", required=True, help="成品文件路径：必须是 .exe 或 .apk（源码包/脚本/网页不被接受）")
     b.add_argument("--project-dir", help="项目目录（默认自动在平台目录下查找）")

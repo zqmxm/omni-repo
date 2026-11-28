@@ -85,7 +85,11 @@ func parseSST(records [][]byte) ([]sstString, error) {
 			}
 			cbExt = int(v)
 		}
-		// 读取字符数据（可能跨 CONTINUE）
+		// 读取字符数据（可能跨 CONTINUE；切在字符串之间时不该有 option flag，
+		// 所以进入字符段前清掉上一次跨块标记）
+		br.inChars = true
+		br.charUTF16 = isUTF16
+		br.boundaryPending = false
 		chars := make([]uint16, 0, cch)
 		for j := 0; j < int(cch); j++ {
 			v, err := br.readChar(isUTF16)
@@ -94,6 +98,7 @@ func parseSST(records [][]byte) ([]sstString, error) {
 			}
 			chars = append(chars, v)
 		}
+		br.inChars = false
 		richRuns, err := br.readBytes(cRun * 4)
 		if err != nil {
 			return nil, err
@@ -118,21 +123,28 @@ type sstReader struct {
 	chunks   []struct{ data []byte }
 	chunkIdx int
 	pos      int
+
+	// v3.1.6：BIFF8 规定，字符串跨 CONTINUE 边界时，新记录开头有 1 字节
+	// option flag，指明后续字符是压缩(0)还是 UTF-16(1)。旧实现直接拼接，
+	// 会把这个 flag 当成字符读进去，导致字符串整体错位。
+	inChars         bool
+	charUTF16       bool
+	boundaryPending bool
 }
 
 func (r *sstReader) readByte() (byte, error) {
-	if r.chunkIdx >= len(r.chunks) {
-		return 0, fmt.Errorf("SST 数据结束")
-	}
-	c := &r.chunks[r.chunkIdx]
-	if r.pos >= len(c.data) {
+	for r.chunkIdx < len(r.chunks) {
+		c := &r.chunks[r.chunkIdx]
+		if r.pos < len(c.data) {
+			b := c.data[r.pos]
+			r.pos++
+			return b, nil
+		}
 		r.chunkIdx++
 		r.pos = 0
-		return r.readByte()
+		r.boundaryPending = true // 跨到下一个 CONTINUE 了
 	}
-	b := c.data[r.pos]
-	r.pos++
-	return b, nil
+	return 0, fmt.Errorf("SST 数据结束")
 }
 
 func (r *sstReader) readU16() (uint16, error) {
@@ -160,6 +172,17 @@ func (r *sstReader) readU32() (uint32, error) {
 }
 
 func (r *sstReader) readChar(isUTF16 bool) (uint16, error) {
+	if r.inChars {
+		if r.boundaryPending {
+			flag, err := r.readByte() // 消费 CONTINUE 开头的 option flag
+			if err != nil {
+				return 0, err
+			}
+			r.charUTF16 = flag&0x01 != 0
+			r.boundaryPending = false
+		}
+		isUTF16 = r.charUTF16
+	}
 	if isUTF16 {
 		return r.readU16()
 	}
@@ -182,35 +205,62 @@ func (r *sstReader) readBytes(n int) ([]byte, error) {
 	return out, nil
 }
 
-// encodeSST 把字符串列表编码为 SST 记录数据（不含记录头），按需拆分 CONTINUE
-func encodeSST(strs []sstString) []byte {
+// encodeOneSSTString 编码单个 XLUnicodeRichExtendedString（不含记录头）
+func encodeOneSSTString(s sstString) []byte {
 	var out []byte
-	out = appendU32(out, uint32(len(strs))) // total
-	out = appendU32(out, uint32(len(strs))) // unique
-	for _, s := range strs {
-		u := encodeUTF16(s.text)
-		f := byte(0x01) // UTF-16
-		if s.hasRich {
-			f |= 0x08
-		}
-		if s.hasExt {
-			f |= 0x04
-		}
-		out = appendU16(out, uint16(len(u)))
-		out = append(out, f)
-		if s.hasRich {
-			out = appendU16(out, uint16(len(s.richRuns)/4))
-		}
-		if s.hasExt {
-			out = appendU32(out, uint32(len(s.extData)))
-		}
-		for _, ch := range u {
-			out = appendU16(out, ch)
-		}
-		out = append(out, s.richRuns...)
-		out = append(out, s.extData...)
+	u := encodeUTF16(s.text)
+	f := byte(0x01) // UTF-16
+	if s.hasRich {
+		f |= 0x08
 	}
+	if s.hasExt {
+		f |= 0x04
+	}
+	out = appendU16(out, uint16(len(u)))
+	out = append(out, f)
+	if s.hasRich {
+		out = appendU16(out, uint16(len(s.richRuns)/4))
+	}
+	if s.hasExt {
+		out = appendU32(out, uint32(len(s.extData)))
+	}
+	for _, ch := range u {
+		out = appendU16(out, ch)
+	}
+	out = append(out, s.richRuns...)
+	out = append(out, s.extData...)
 	return out
+}
+
+// encodeSST 返回 BIFF 记录数据块（第 0 块写进 SST，其余写进 CONTINUE）。
+// v3.1.6：切分点只落在「字符串之间」，绝不把一个字符串拦腰截断 ——
+// 这样不需要在 CONTINUE 开头写 option flag，Excel 也不会读错位。
+// total 用原 SST 的总引用数（不是 unique），否则 Excel 可能提示修复。
+func encodeSST(strs []sstString, total int) [][]byte {
+	if total < len(strs) {
+		total = len(strs)
+	}
+	cur := make([]byte, 0, 8224)
+	cur = appendU32(cur, uint32(total))
+	cur = appendU32(cur, uint32(len(strs))) // unique
+	var chunks [][]byte
+	flush := func() {
+		if len(cur) > 0 {
+			chunks = append(chunks, cur)
+			cur = make([]byte, 0, 8224)
+		}
+	}
+	for _, s := range strs {
+		rec := encodeOneSSTString(s)
+		// 单个字符串再长也完整放进一块（BIFF 记录长度是 16 位，实际 rarely 触顶）；
+		// 只有「加上下一个字符串会超限」才在字符串边界处切。
+		if len(cur)+len(rec) > 8224 && len(cur) > 8 {
+			flush()
+		}
+		cur = append(cur, rec...)
+	}
+	flush()
+	return chunks
 }
 
 // replaceXlsxSST 替换 xls 工作簿中的共享字符串（流式重写 BIFF 记录）
@@ -258,21 +308,18 @@ func replaceXlsSST(stream []byte, pairs []Pair) ([]byte, int, error) {
 		return stream, 0, nil
 	}
 
-	// 重新编码 SST，拆分为 SR + CONTINUE 记录（每条 <= 8224 字节）
-	newData := encodeSST(strs)
+	// v3.1.6：保留原 SST 的 total（单元格引用总数），旧实现把它写成 unique，
+	// Excel 读回时可能提示「文件已损坏」。替换只改文本，引用总数不变。
+	origTotal := int(binary.LittleEndian.Uint32(sstRecs[0][0:4]))
+	newChunks := encodeSST(strs, origTotal)
 	var newRecs []biffRecord
 	newRecs = append(newRecs, records[:sstIdx]...)
-	for off := 0; off < len(newData); {
-		n := len(newData) - off
-		if n > 8224 {
-			n = 8224
-		}
+	for i, chunk := range newChunks {
 		id := uint16(biffSST)
-		if off > 0 {
+		if i > 0 {
 			id = biffContinue
 		}
-		newRecs = append(newRecs, biffRecord{id: id, data: newData[off : off+n]})
-		off += n
+		newRecs = append(newRecs, biffRecord{id: id, data: chunk})
 	}
 	newRecs = append(newRecs, records[endIdx:]...)
 	return writeBIFFRecords(newRecs), totalHits, nil

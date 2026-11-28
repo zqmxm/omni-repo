@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 )
 
 // maxFileSize 单个文档上限 100MB，防止异常文件
@@ -72,7 +73,8 @@ func ExecuteEx(req ReplaceReq, onItem func(Item)) ExecStats {
 		jobs = append(jobs, fileJob{src: path, out: out, kind: kindOfFile(path), nameChanged: changed})
 	}
 
-	op := UndoOp{Dir: req.Dir, SaveAs: req.SaveAs}
+	// v3.1.6：给本次操作一个唯一 ID，供撤销栈按 ID 增量落盘
+	op := UndoOp{ID: fmt.Sprintf("%d", time.Now().UnixNano()), Dir: req.Dir, SaveAs: req.SaveAs}
 	var opMu sync.Mutex
 	addEntry := func(e *UndoEntry) {
 		if e == nil {
@@ -92,6 +94,14 @@ func ExecuteEx(req ReplaceReq, onItem func(Item)) ExecStats {
 			failed++
 		case "skipped":
 			skipped++
+		}
+		// v3.1.6：每完成一个文件就把撤销进度落盘一次；失败不刷屏，末尾会兜底
+		if !req.DryRun && r.entry != nil {
+			opMu.Lock()
+			snap := op
+			snap.Entries = append([]UndoEntry(nil), op.Entries...)
+			opMu.Unlock()
+			_ = upsertUndoOp(manifestPath, snap)
 		}
 	}
 
@@ -146,9 +156,9 @@ func ExecuteEx(req ReplaceReq, onItem func(Item)) ExecStats {
 		}
 	}
 
-	// ④ 写入撤销栈
+	// ④ 写入撤销栈（按 ID 覆盖，保证 op 完整；中途崩溃也有部分记录）
 	if !req.DryRun && len(op.Entries) > 0 {
-		if err := appendUndoOp(manifestPath, op); err != nil {
+		if err := upsertUndoOp(manifestPath, op); err != nil {
 			onItem(Item{Kind: "undo", Status: "skipped", Message: "替换已完成，但撤销记录写入失败：" + err.Error()})
 		} else {
 			onItem(Item{Kind: "undo", Status: "ok", Message: "本次操作已可撤销"})
@@ -293,14 +303,13 @@ func processJob(j fileJob, req ReplaceReq, manifestPath string) jobResult {
 		return jobResult{item: item, entry: &UndoEntry{Kind: "inplace", Original: j.src, Produced: j.src, Backup: bak}}
 	}
 
-	// 另存：源文件完全不动，只产出到目标目录
-	if hits == 0 && !j.nameChanged {
-		item.Status, item.Message = "skipped", noMatchMessage(j.src, req, "无改动，未另存")
-		removeEmptyParents(filepath.Dir(tmp), req.SaveAs)
-		return jobResult{item: item}
-	}
+	// 另存：源文件完全不动，产出到目标目录
+	// v3.1.3：「另存」= 源文件夹的完整副本。即使内容和文件名都没命中，
+	// 也原样复制一份（字节级保真），不再跳过——否则输出目录里的文件
+	// 会比源目录少一大截，用户会以为文件丢了。
+	unchanged := hits == 0 && !j.nameChanged
 	if hits == 0 {
-		// 内容没命中但文件名变了：直接复制源文件，保证字节级保真
+		// 内容没命中（不论文件名是否变化）：复制源文件，保证字节级保真
 		_ = os.Remove(tmp)
 		if err := copyFile(j.src, tmp); err != nil {
 			return fail("复制源文件失败：" + err.Error())
@@ -319,7 +328,11 @@ func processJob(j fileJob, req ReplaceReq, manifestPath string) jobResult {
 	if err := os.Rename(tmp, j.out); err != nil {
 		return fail("另存写入失败：" + err.Error())
 	}
-	item.Status, item.Message = "ok", "已另存 → " + j.out
+	if unchanged {
+		item.Status, item.Message = "ok", "已原样复制（无改动） → " + j.out
+	} else {
+		item.Status, item.Message = "ok", "已另存 → " + j.out
+	}
 	item.Output = j.out
 	return jobResult{item: item, entry: &UndoEntry{Kind: "saveas", Original: j.src, Produced: j.out}}
 }
@@ -327,10 +340,7 @@ func processJob(j fileJob, req ReplaceReq, manifestPath string) jobResult {
 // copyOnlyJob 「只替换文件名 + 另存」时把文件原样复制到新名字
 func copyOnlyJob(j fileJob, req ReplaceReq) jobResult {
 	item := Item{Path: j.src, Kind: "saveas"}
-	if !j.nameChanged {
-		item.Status, item.Message = "skipped", "文件名无改动，未另存"
-		return jobResult{item: item}
-	}
+	// v3.1.3：文件名没变也原样复制，保证另存目录是完整副本
 	if req.DryRun {
 		item.Status, item.Message = "skipped", "预览：将另存为 "+j.out
 		item.Output = j.out
@@ -352,7 +362,11 @@ func copyOnlyJob(j fileJob, req ReplaceReq) jobResult {
 		item.Status, item.Message = "failed", "复制失败：" + err.Error()
 		return jobResult{item: item}
 	}
-	item.Status, item.Message, item.Output = "ok", "已另存 → "+j.out, j.out
+	if j.nameChanged {
+		item.Status, item.Message, item.Output = "ok", "已另存 → "+j.out, j.out
+	} else {
+		item.Status, item.Message, item.Output = "ok", "已原样复制（无改动） → "+j.out, j.out
+	}
 	return jobResult{item: item, entry: &UndoEntry{Kind: "saveas", Original: j.src, Produced: j.out}}
 }
 
@@ -404,9 +418,15 @@ func scanFiles(req ReplaceReq) ([]string, error) {
 	if !info.IsDir() {
 		return nil, fmt.Errorf("填写的路径不是文件夹：%s", req.Dir)
 	}
+	// v3.1.3：只有当另存目录位于源目录「内部」时才需要排除，避免自产自销。
+	// 若另存目录是源目录的父目录（例如源=桌面\AAA，另存=桌面），
+	// 旧逻辑会把源目录的所有子文件夹误判成「另存目录」而 SkipDir，导致漏文件。
 	skipDir := ""
 	if req.SaveAs != "" {
-		skipDir = filepath.Clean(req.SaveAs)
+		rel, e := filepath.Rel(filepath.Clean(req.Dir), filepath.Clean(req.SaveAs))
+		if e == nil && rel != "." && !strings.HasPrefix(rel, "..") {
+			skipDir = filepath.Clean(req.SaveAs)
+		}
 	}
 	var files []string
 	err = filepath.WalkDir(req.Dir, func(path string, d os.DirEntry, err error) error {
@@ -428,6 +448,12 @@ func scanFiles(req ReplaceReq) ([]string, error) {
 					return filepath.SkipDir // 跳过隐藏目录
 				}
 			}
+			return nil
+		}
+		// Office / WPS 打开文档时生成的临时锁文件（~$xxx / $xxx）和隐藏文件
+		// 不是用户文档，且常被独占打开，会把统计刷成「失败」。
+		base := d.Name()
+		if strings.HasPrefix(base, "~$") || strings.HasPrefix(base, "$") || strings.HasPrefix(base, ".") {
 			return nil
 		}
 		if kindOfFile(path) == "" {

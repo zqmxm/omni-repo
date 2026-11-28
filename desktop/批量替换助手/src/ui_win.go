@@ -9,11 +9,13 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 	"unsafe"
 )
 
@@ -289,6 +291,7 @@ var (
 	pGetModuleHandleW    = k32.NewProc("GetModuleHandleW")
 
 	pCreateSolidBrush = g32.NewProc("CreateSolidBrush")
+	pGetStockObject   = g32.NewProc("GetStockObject") // DEFAULT_GUI_FONT=17
 	pDeleteObject     = g32.NewProc("DeleteObject")
 	pCreateFontW      = g32.NewProc("CreateFontW")
 	pSelectObject     = g32.NewProc("SelectObject")
@@ -376,15 +379,40 @@ func createWindow(className, title string, style uint32, x, y, w, h int32, paren
 	return hwnd
 }
 
-func scale(st *appState) float64 {
-	if st == nil || st.hwnd == 0 {
-		return 1
+// v3.1.2：不再调用 GetDpiForWindow（部分系统缺失该 API 且会拖慢启动），
+// 布局统一按 96 DPI 逻辑像素，窗口用固定尺寸，避免高 DPI 换算把控件挤出可视区。
+func scale(st *appState) float64 { return 1 }
+
+// ---------- 启动诊断日志（v3.1.2 新增） ----------
+// 写在 exe 同目录；失败则退到系统临时目录。万一仍出现白屏/未响应，
+// 把「批量替换助手-启动日志.txt」发来即可定位卡在哪一步。
+var startupLogOnce sync.Once
+var startupLogPath string
+
+func startupLog(msg string) {
+	startupLogOnce.Do(func() {
+		cands := []string{}
+		if exe, err := os.Executable(); err == nil {
+			cands = append(cands, filepath.Join(filepath.Dir(exe), "批量替换助手-启动日志.txt"))
+		}
+		cands = append(cands, "批量替换助手-启动日志.txt",
+			filepath.Join(os.TempDir(), "批量替换助手-启动日志.txt"))
+		for _, p := range cands {
+			if f, e := os.OpenFile(p, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644); e == nil {
+				startupLogPath = p
+				f.WriteString("\r\n===== 启动 " + time.Now().Format("2006-01-02 15:04:05") + " =====\r\n")
+				f.Close()
+				break
+			}
+		}
+	})
+	if startupLogPath == "" {
+		return
 	}
-	dpi, _, _ := pGetDpiForWindow.Call(st.hwnd)
-	if dpi == 0 {
-		return 1
+	if f, e := os.OpenFile(startupLogPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644); e == nil {
+		f.WriteString("[" + time.Now().Format("15:04:05.000") + "] " + msg + "\r\n")
+		f.Close()
 	}
-	return float64(dpi) / 96.0
 }
 
 func appendLog(st *appState, text string) {
@@ -479,21 +507,24 @@ func collectReq(st *appState) (ReplaceReq, error) {
 		ReplaceContent: st.checked[idReplaceContent],
 		RenameFiles:    st.checked[idRenameFiles],
 	}
-	if st.checked[idSaveAsChk] {
-		s := strings.TrimSpace(getWindowText(st.hSaveAsDir))
-		if s == "" {
-			return ReplaceReq{}, fmtErr("已勾选「另存」，请先用「另存到…」选择输出目录")
-		}
-		req.SaveAs = s
-	}
 	// 关键：跳过「替换为」为空的行，避免把原内容删掉
+	pairs := make([]Pair, 0, len(st.rows))
 	for _, r := range st.rows {
 		from := strings.TrimSpace(getWindowText(r.hFrom))
 		to := getWindowText(r.hTo)
 		if from == "" || to == "" {
 			continue
 		}
-		req.Pairs = append(req.Pairs, Pair{From: from, To: to})
+		pairs = append(pairs, Pair{From: from, To: to})
+	}
+	req.Pairs = pairs
+	// v3.1.5：规则先收齐，再算输出文件夹名（文件夹名也过同一套规则）
+	if st.checked[idSaveAsChk] {
+		s := strings.TrimSpace(getWindowText(st.hSaveAsDir))
+		if s == "" {
+			return ReplaceReq{}, fmtErr("已勾选「另存」，请先用「另存到…」选择输出目录")
+		}
+		req.SaveAs = normalizeSaveAsDir(absDir, s, pairs)
 	}
 	if err := validateReq(&req); err != nil {
 		return ReplaceReq{}, err
@@ -520,8 +551,13 @@ func startTask(st *appState) {
 	appendLog(st, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\r\n")
 	appendLog(st, "开始处理文件夹："+req.Dir+"\r\n")
 	appendLog(st, "规则 "+itoa(len(req.Pairs))+" 组，替换内容="+yesNo(req.ReplaceContent)+"，替换文件名="+yesNo(req.RenameFiles)+"\r\n")
+	if len(req.Pairs) > 1 {
+		appendLog(st, "⚠ 规则按顺序链式生效：前一条的「替换为」若命中后一条的「原内容」，会被继续替换（如 北京→上海 + 上海→天津 会得到 天津）\r\n")
+	}
 	if req.SaveAs != "" {
 		appendLog(st, "输出方式：另存 → "+req.SaveAs+"（原文件完全不动）\r\n")
+		appendLog(st, "输出会统一放进上面这个文件夹，里面的文件与目录结构和源文件夹一致\r\n")
+		appendLog(st, "输出文件夹名也会按同一套规则替换；源文件夹本身不改名\r\n")
 	} else {
 		appendLog(st, "输出方式：原地替换（完成后可点「↶ 撤销上次替换」还原）\r\n")
 	}
@@ -840,15 +876,12 @@ func wndProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
 		st.hwnd = hwnd
 		st.hPanelBrush, _, _ = pCreateSolidBrush.Call(colorPanel)
 
-		// 深色标题栏（DWMWA_USE_IMMERSIVE_DARK_MODE = 20）
-		val := uint32(1)
-		pDwmSetWindowAttribute.Call(hwnd, 20, uintptr(unsafe.Pointer(&val)), 4)
-
-		// 字体
-		// CreateFontW 共 14 个参数：高度、宽度、角度、方向、字重、斜体、下划线、删除线、
-		// 字符集、输出精度、裁剪精度、质量、字体系列、字体名。之前漏传字体系列参数。
-		st.hFont, _, _ = pCreateFontW.Call(20, 0, 0, 0, 400, 0, 0, 0, 134, 0, 0, 0, 0, uintptr(unsafe.Pointer(utf16ptr("微软雅黑"))))
-		st.hFontBold, _, _ = pCreateFontW.Call(22, 0, 0, 0, 700, 0, 0, 0, 134, 0, 0, 0, 0, uintptr(unsafe.Pointer(utf16ptr("微软雅黑"))))
+		// v3.1.2：去掉 DWM 深色标题栏与 14 参数的 CreateFontW。
+		// DwmSetWindowAttribute 需与 DWM 进程同步通信，在精简系统 / 远程桌面下
+		// 可能长时间不返回；CreateFontW 也可能卡在 GDI 字体加载。改用系统 stock 字体。
+		hFont, _, _ := pGetStockObject.Call(17) // DEFAULT_GUI_FONT = 17
+		st.hFont, st.hFontBold = hFont, hFont
+		startupLog("WM_CREATE：字体就绪")
 
 		st.checked = map[uint32]bool{
 			idRecursive:      true,
@@ -875,7 +908,7 @@ func wndProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
 		st.hContent = createWindow("Button", "替换文档内容", wsChild|wsVisible|wsTabstop|bsAutoCheckbox, 0, 0, 0, 0, hwnd, idReplaceContent)
 		st.hRename = createWindow("Button", "同时替换文件名", wsChild|wsVisible|wsTabstop|bsAutoCheckbox, 0, 0, 0, 0, hwnd, idRenameFiles)
 		// ③ 输出方式：不勾选「另存」就是在原文件上直接改
-		st.hLblOut = createWindow("Static", "③ 输出方式（不勾选「另存」即在原文件上直接修改；替换后可点「撤销」还原）", wsChild|wsVisible|ssLeft, 0, 0, 0, 0, hwnd, 0)
+		st.hLblOut = createWindow("Static", "③ 输出方式（勾选「另存」会生成一个新文件夹，文件夹名和里面的文件名都按规则替换）", wsChild|wsVisible|ssLeft, 0, 0, 0, 0, hwnd, 0)
 		st.hSaveAsChk = createWindow("Button", "另存为新文件（原文件不动）", wsChild|wsVisible|wsTabstop|bsAutoCheckbox, 0, 0, 0, 0, hwnd, idSaveAsChk)
 		st.hSaveAsDir = createWindow("Edit", "", wsChild|wsVisible|wsTabstop|wsBorder, 0, 0, 0, 0, hwnd, idSaveAsEdit)
 		st.hSaveAsBrw = createWindow("Button", "另存到…", wsChild|wsVisible|wsTabstop, 0, 0, 0, 0, hwnd, idSaveAsBrowse)
@@ -911,40 +944,20 @@ func wndProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
 			pSendMessageW.Call(h, bmSetCheck, 1, 0)
 		}
 
-		appendLog(st, "批量替换助手 已就绪（支持 .docx/.xlsx/.doc/.xls 及宏文档，纯本地无需 Office）。\r\n请选择文件夹并填写替换规则。\r\n")
+		appendLog(st, "批量替换助手 v3.1.6 已就绪（支持 .docx/.xlsx/.doc/.xls 及宏文档，纯本地无需 Office）。\r\n请选择文件夹并填写替换规则。\r\n")
 		layoutControls(st)
+		startupLog("WM_CREATE：控件与布局完成")
 		return 0
 
 	case wmSize:
 		layoutControls(st)
-		// 尺寸变化时才重建一次渐变缓存，平时重绘只做 BitBlt
-		rebuildBackground(st, int32(lParam&0xFFFF), int32((lParam>>16)&0xFFFF))
 		return 0
 
-	case wmEraseBkgnd:
-		// 不擦除：WM_PAINT 用缓存位图一次贴完，消除闪烁并避免重复 GradientFill
-		return 1
-
-	case wmPaint:
-		paintBackground(st)
-		return 0
-
-	case wmCtlColorEdit, wmCtlColorStatic, wmCtlColorBtn:
-		hdc := wParam
-		pSetBkMode.Call(hdc, opaque)
-		pSetTextColor.Call(hdc, colorText)
-		pSetBkColor.Call(hdc, colorPanel)
-		return st.hPanelBrush // 复用画刷
-
-	case wmDrawItem:
-		dis := (*DRAWITEMSTRUCT)(unsafe.Pointer(lParam))
-		id := dis.CtlID
-		if id == idBrowseBtn || id == idAddPair || id == idStartBtn || (id >= idPairFromBase && (id-idPairFromBase)%3 == 2) {
-			drawButton(st, dis, id == idStartBtn || id == idBrowseBtn)
-		} else if id == idRecursive || id == idReplaceContent || id == idRenameFiles {
-			drawCheckbox(st, dis)
-		}
-		return 0
+	// v3.1.2 修复「白屏 + 未响应」：不再拦截
+	// WM_ERASEBKGND / WM_PAINT / WM_CTLCOLOR* / WM_DRAWITEM，
+	// 全部交给 DefWindowProc，用注册类时的系统画刷（COLOR_WINDOW）擦背景、
+	// 用系统标准控件外观绘制。自绘渐变 + BeginPaint/EndPaint + GradientFill
+	// 在部分 Windows 环境会让窗口过程长时间不返回，是白屏未响应的高发区。
 
 	case wmCommand:
 		id := uint32(wParam & 0xFFFF)
@@ -1051,16 +1064,10 @@ func wndProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
 		return 0
 
 	case wmDestroy:
-		releaseBackground(st)
 		if st.hPanelBrush != 0 {
 			pDeleteObject.Call(st.hPanelBrush)
 		}
-		if st.hFont != 0 {
-			pDeleteObject.Call(st.hFont)
-		}
-		if st.hFontBold != 0 {
-			pDeleteObject.Call(st.hFontBold)
-		}
+		// hFont 是 GetStockObject 得到的系统共享对象，绝不能 DeleteObject
 		pPostQuitMessage.Call(0)
 		return 0
 	}
@@ -1085,21 +1092,14 @@ func enumWindowsProc(hwnd, lParam uintptr) uintptr {
 
 // ---------- 应用入口（Windows） ----------
 func runApp() error {
-	// 高 DPI 感知
-	pSetProcessDpiAware.Call(dpiAwareV2)
+	startupLog("进入 runApp")
 
-	// 单实例：CreateMutexW 的返回 err 即 GetLastError（LazyProc.Call 语义）
-	mutexName := utf16ptr("Global\\批量替换助手_Desktop_v3")
-	hMutex, _, mutexErr := pCreateMutexW.Call(0, 1, uintptr(unsafe.Pointer(mutexName)))
-	if errno, ok := mutexErr.(syscall.Errno); ok && errno == syscall.ERROR_ALREADY_EXISTS {
-		enumCB = syscall.NewCallback(enumWindowsProc)
-		pEnumWindows.Call(enumCB, 0)
-		pCloseHandle.Call(hMutex)
-		return nil
-	}
-	_ = hMutex // 进程退出自动释放
+	// v3.1.2：去掉 SetProcessDpiAwarenessContext 与 Global\ 单实例互斥体。
+	// 前者在部分系统会拖慢启动；后者会让「上一次卡死的残留实例」挡住新 exe，
+	// 表现为双击后什么都没发生。现在每次启动都开一个全新窗口。
 
 	hInst, _, _ := pGetModuleHandleW.Call(0)
+	startupLog("取模块句柄完成")
 	className := utf16ptr("批量替换助手_Window")
 	title := utf16ptr("批量替换助手 v" + appVersion + " · 本地桌面版")
 
@@ -1116,6 +1116,7 @@ func runApp() error {
 		lpfnWndProc:   wndProcCB,
 		hInstance:     hInst,
 		hCursor:       hCursor,
+		hbrBackground: 6, // COLOR_WINDOW + 1：由系统擦背景，不自己画
 		lpszClassName: className,
 	}
 	classCB = uintptr(unsafe.Pointer(wc.lpszClassName)) // 保活（className 指针）
@@ -1144,29 +1145,23 @@ func runApp() error {
 		return &uiError{"创建窗口失败"}
 	}
 
-	// 按当前显示器 DPI 把逻辑尺寸 920x800 换算成物理像素，
-	// 否则 125%/150% 缩放下窗口会被压扁，日志框只剩几十像素。
-	dpi, _, _ := pGetDpiForWindow.Call(hwnd)
-	s := 1.0
-	if dpi > 0 {
-		s = float64(dpi) / 96.0
-	}
-	pSetWindowPos.Call(hwnd, 0, 0, 0,
-		uintptr(int32(920*s)), uintptr(int32(800*s)),
-		0x0002|0x0004) // SWP_NOMOVE | SWP_NOZORDER
+	// v3.1.2：固定 920x800 物理像素，不做 DPI 换算。
+	startupLog("主窗口创建成功，准备显示")
 
-	pShowWindow.Call(hwnd, 9) // SW_SHOWDEFAULT
-	pUpdateWindow.Call(hwnd)
-	// 注意：绝不能用后台 goroutine 定时 PostMessage "保活"。
-	// 那种做法在 Go 的 syscall.NewCallback 窗口过程模型下会与主消息循环争抢，
-	// 反而制造出稳定的"未响应"假象（实测空闲约 5 秒即卡死）。
-	// GetMessageW 消息循环本身完全够用，无需任何保活。
+	pShowWindow.Call(hwnd, 5) // SW_SHOW（旧值 9=SW_RESTORE 对新建窗口语义含糊）
+	pUpdateWindow.Call(hwnd)  // 同步触发一次 WM_PAINT，现在由 DefWindowProc 秒回
+	startupLog("窗口已显示，即将进入消息循环")
 
 	var msg MSG
+	firstMsg := true
 	for {
 		r, _, getErr := pGetMessageW.Call(uintptr(unsafe.Pointer(&msg)), 0, 0, 0)
 		if r == 0 {
 			break
+		}
+		if firstMsg {
+			firstMsg = false
+			startupLog("消息循环已收到第一条消息（窗口可交互）")
 		}
 		if r == ^uintptr(0) {
 			if errno, ok := getErr.(syscall.Errno); ok && errno != 0 {

@@ -1,7 +1,8 @@
 name: Auto Backup (通用自动备份)
 
 # 任何 AI 新增软件后，只需在 build-manifest.json 里加一条配置，
-# 本工作流会自动构建 exe/apk 并更新固定 Release，只保留最新版。
+# 本工作流会自动构建 exe/apk 并【新增一个独立 Release】。
+# v2 永不覆盖：历史 Release / tag / 附件一律不删除、不覆盖。
 # 也可在 Actions 页面手动触发并选择软件。
 
 on:
@@ -36,7 +37,7 @@ jobs:
           python3 - <<'PY'
           import json, os
           manifest = json.load(open('build-manifest.json', encoding='utf-8'))
-          apps = [a for a in manifest.get('apps', []) if not a.get('manual_release')]
+          apps = list(manifest.get('apps', []))
           target = "${{ inputs.app }}".strip()
           if target:
               apps = [a for a in apps if a['name'] == target]
@@ -93,11 +94,15 @@ jobs:
         shell: bash
         run: go test ./src -v
 
-      - name: 构建 Go Windows exe
+      - name: 构建 Go Windows exe（GUI + 可选 CLI）
         if: matrix.kind == 'go-exe'
         working-directory: ${{ matrix.dir }}
         shell: bash
-        run: go build -ldflags="-H=windowsgui -s -w" -o "${{ matrix.artifact }}" ./src
+        run: |
+          go build -ldflags="-H=windowsgui -s -w" -o "${{ matrix.artifact }}" ./src
+          if [ -n "${{ matrix.cli_artifact }}" ]; then
+            go build -ldflags="-s -w" -o "${{ matrix.cli_artifact }}" ./src
+          fi
 
       - name: 构建 Android APK
         if: matrix.kind == 'android'
@@ -148,9 +153,11 @@ jobs:
           NEXT="$MAJOR.$MINOR.$((PATCH+1))"
           echo "$NEXT" > "$VF"
           echo "version=$NEXT" >> "$GITHUB_OUTPUT"
-          echo "tag=${{ matrix.name }}-latest" >> "$GITHUB_OUTPUT"
+          # v2 永不覆盖：tag 全局唯一（软件名 + 版本 + UTC 时间 + run_id）
+          STAMP=$(date -u +%Y%m%d-%H%M%S)
+          echo "tag=${{ matrix.name }}-v${NEXT}-${STAMP}-${GITHUB_RUN_ID}" >> "$GITHUB_OUTPUT"
 
-      - name: 统一为最新版资产文件名
+      - name: 统一资产文件名（GUI + 可选 CLI）
         id: stable
         shell: bash
         run: |
@@ -159,54 +166,31 @@ jobs:
           ASSET="${{ matrix.name }}.$EXT"
           cp "${{ steps.artifact.outputs.path }}" "$ASSET"
           echo "path=$ASSET" >> "$GITHUB_OUTPUT"
+          if [ -n "${{ matrix.cli_artifact }}" ]; then
+            SRC=$(find "${{ matrix.dir }}" -type f -name "${{ matrix.cli_artifact }}" | head -1)
+            if [ -n "$SRC" ]; then
+              cp "$SRC" "${{ matrix.cli_artifact }}"
+              echo "cli_path=${{ matrix.cli_artifact }}" >> "$GITHUB_OUTPUT"
+            fi
+          fi
 
-      - name: 删除该软件的历史 Release（只留最新版）
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const name = '${{ matrix.name }}';
-            const keep = name + '-latest';
-            const rels = await github.paginate(github.rest.repos.listReleases, {
-              owner: context.repo.owner, repo: context.repo.repo, per_page: 100,
-            });
-            for (const r of rels) {
-              if (r.tag_name !== keep && r.tag_name.startsWith(name + '-v')) {
-                await github.rest.repos.deleteRelease({
-                  owner: context.repo.owner, repo: context.repo.repo, release_id: r.id,
-                });
-              }
-            }
-
-      - name: 清理当前 Release 的旧资产（避免中文名与旧名并存）
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const tag = '${{ matrix.name }}-latest';
-            let rel;
-            try {
-              rel = await github.rest.repos.getReleaseByTag({
-                owner: context.repo.owner, repo: context.repo.repo, tag,
-              });
-            } catch (e) { return; }
-            for (const a of rel.data.assets) {
-              await github.rest.repos.deleteReleaseAsset({
-                owner: context.repo.owner, repo: context.repo.repo, asset_id: a.id,
-              });
-            }
-
-      - name: 更新固定 Release 并上传最新版产物
+      - name: 新增独立 Release（永不覆盖历史）
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
           name: ${{ matrix.name }} v${{ steps.ver.outputs.version }}
+          # 只移动 Latest 徽章，不删除/不修改任何历史 Release
+          make_latest: true
           body: |
             ## ${{ matrix.name }} v${{ steps.ver.outputs.version }}
 
             - 由 GitHub Actions 自动构建并备份
-            - 只保留最新版：每次更新覆盖同一个 Release，旧版本会删除
+            - **v2 永不覆盖**：本次是一个全新的独立 Release，历史 Release / tag / 附件全部保留
             - 源码随本次 commit 一同保留在仓库
-          files: ${{ steps.stable.outputs.path }}
-          overwrite_files: true
+            - tag `${{ steps.ver.outputs.tag }}` 全局唯一，可用 `omni.py download --tag` 单独取回
+          files: |
+            ${{ steps.stable.outputs.path }}
+            ${{ steps.stable.outputs.cli_path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

@@ -1,7 +1,12 @@
+//go:build legacy
 
 package main
 
 // legacy.go —— 旧格式 .doc/.xls 替换（通过本机 Office / WPS 的 COM 后台接口）
+//
+// 【已停用】v3.1.6 起本文件默认不参与编译（build tag: legacy）。
+// engine.go 的 legacy-doc / legacy-xls 走自研 docparse.go / xls.go，
+// 全仓没有任何调用点；保留仅为历史参考，需要时 go build -tags legacy。
 //
 // 标准库无法可靠解析 OLE2 格式的 .doc/.xls，因此借助 Windows 上安装的
 // Microsoft Office 或 WPS：用 PowerShell 创建 COM 对象，后台打开文档 →

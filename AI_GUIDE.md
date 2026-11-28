@@ -1,3 +1,10 @@
+> **备份规则 v2 · 永不覆盖（唯一权威说明）**：每次做完软件 / 每次 push 触发构建，
+> 都会**新增一个全局唯一的 Release**（tag = `<软件名>-v<版本>-<UTC时间戳>-<随机>`）。
+> 源码进 git 新 commit，成品 exe/apk 挂到这个新 Release。
+> **历史 Release、tag、附件一律不删除、不覆盖、不使用 `overwrite_files`**，
+> 任意一个旧版本都能用 `omni.py download --tag` 单独取回。
+> 唯一权威规范见 `BACKUP_GUIDE.md`；本文件其余章节若与本节冲突，以本节为准。
+
 # AI_GUIDE.md · 在别的 AI 软件里也能自己用
 
 这个仓库**故意不绑定任何 AI**。它里面没有私有接口、没有平台插件、没有账号体系，只有：纯文本规范 + 标准开源工具链（Git / GitHub Actions / Python / Node / Gradle / Android SDK）。所以换个 AI，照用不误。
@@ -69,7 +76,7 @@
 
 ## 自动备份：做完软件直接存到 GitHub
 
-本仓库已内置备份系统，任何 AI 做完软件后都能把源码和 exe/apk 存到 GitHub，**每个软件只保留最新版，更新时覆盖同一个 Release**。详见 `BACKUP_GUIDE.md`。
+本仓库已内置备份系统，任何 AI 做完软件后都能把源码和 exe/apk 存到 GitHub，**每次新增一个独立 Release，历史版本全部保留、永不覆盖**。详见 `BACKUP_GUIDE.md`。
 
 **一次配置**（任何 AI 帮你做，或你自己跑一次）：
 ```bash
@@ -87,7 +94,7 @@ python scripts/omni.py download --tag <tag>    # 下载某个版本的 exe
 **在 AI 对话框里直接上传/下载**（无需打开 GitHub）：
 把 `scripts/mcp_server.py` 注册为 MCP 工具（配置模板见 `mcp-config.example.json`），AI 就能直接调用 `omni_publish` / `omni_list` / `omni_download`。支持 MCP 的 Cursor、Claude Desktop、WorkBuddy 等都可用。
 
-**CI 自动备份**：产物由 GitHub Actions 构建时，在 `build-manifest.json` 加一条配置，`auto-backup.yml` 会自动打包并更新固定 Release，连命令都不用敲。
+**CI 自动备份**：产物由 GitHub Actions 构建时，在 `build-manifest.json` 加一条配置，`auto-backup.yml` 会自动打包并**新增独立 Release**，连命令都不用敲。
 
 ## 换 AI 时不会丢的东西
 

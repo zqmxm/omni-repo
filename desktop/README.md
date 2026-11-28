@@ -81,13 +81,13 @@ CI 用 `actions/setup-go@v5` + `go test` + 上面的构建命令，参考 `.gith
 | 文件区域批量重命名 | `desktop/文件区域批量重命名/` | 从 PDF / Word / Excel 的固定位置读文字，给整批文件各自改名 | Releases → `文件区域批量重命名-latest` |
 | 夸克扫描王批量处理 | `desktop/夸克扫描王批量处理/` | 批量把 PDF 放进夸克扫描王、批量收回到指定文件夹 | Releases → `夸克扫描王批量处理-latest` |
 
-这两个都是**已经产出成品的归档**：源码在本目录，exe 只在 Release（仓库不收二进制）。成品含内置中文 OCR 模型 / 纯本地文件操作，CI 无法重建，所以没接 `build-manifest.json` 自动构建，也没加 workflow，后续更新直接覆盖固定 Release。
+这两个都是**已经产出成品的归档**：源码在本目录，exe 只在 Release（仓库不收二进制）。成品含内置中文 OCR 模型 / 纯本地文件操作，CI 无法重建，所以没接 `build-manifest.json` 自动构建，也没加 workflow；后续每次更新都会**新增一个独立 Release**，历史保留。
 
 两个目录里都有 `README.md`（怎么用、每个文件是什么）、`VERSION`、`CHECKSUMS.md`（成品校验值）。「夸克扫描王批量处理/历史版本/」放的是已作废的中间版源码，只备查，不要拿去编译。
 
 ### 批量替换助手（v3.1.1，接了自动构建）
 
-`desktop/批量替换助手/` 是 Go 写的批量替换工具：**源码入库 + 专属 workflow 出 Artifact**，但和上面两个软件一样属于手动归档（`build-manifest.json` 里标了 `manual_release`），不进 `auto-backup.yml` 自动矩阵，固定 Release 由人工核对后更新。
+`desktop/批量替换助手/` 是 Go 写的批量替换工具：**源码入库 + 进 `auto-backup.yml` 自动矩阵**（`build-manifest.json` 已去掉 `manual_release`），每次 push 自动构建 GUI/CLI 两个 exe 并**新增独立 Release**，历史版本全部保留。
 
 - 源码：`src/` + `internal/`，Go 1.21+，零第三方依赖
 - 本地出包：`build.bat`（GUI + CLI 两个 exe），或 `CROSS=1 bash build.sh`

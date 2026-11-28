@@ -18,7 +18,7 @@ import (
 	"strings"
 )
 
-const appVersion = "3.1.1"
+const appVersion = "3.1.6"
 
 type ruleList []Pair
 
@@ -109,7 +109,7 @@ func runCLI(args []string) int {
 		Recursive:      !*noRecursive,
 		ReplaceContent: !*noContent,
 		RenameFiles:    *rename,
-		SaveAs:         *saveAs,
+		SaveAs:         normalizeSaveAsDir(*dir, *saveAs, pairs),
 		Overwrite:      *overwrite,
 		DryRun:         *dryRun,
 		StatePath:      *state,
@@ -269,7 +269,8 @@ func printHelp() {
 
 输出方式（二选一）：
   （不指定）           原地替换，直接改源文件
-  --save-as <目录>     另存：源文件完全不动，结果写到该目录并保持子目录结构
+  --save-as <目录>     另存：源文件完全不动；输出文件夹名也按同一套规则替换，
+                      内部文件与目录结构与源文件夹一致
   --overwrite          另存时允许覆盖目标目录里已存在的同名文件（默认跳过）
 
 选项：

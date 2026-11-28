@@ -337,7 +337,7 @@ def delete_release_assets(token: str, release: dict) -> None:
 
 
 def upsert_release(token: str, tag: str, name: str, body: str) -> dict:
-    """同一个软件始终更新同一个 Release，不保留旧版本。"""
+    """【v1 遗留，已停用】覆盖式更新固定 Release。v2 publish 不再调用。"""
     owner, repo = get_repo()
     existing = find_release_by_tag(token, tag)
     if existing:
@@ -350,7 +350,7 @@ def upsert_release(token: str, tag: str, name: str, body: str) -> dict:
 
 
 def delete_old_releases(token: str, name: str, keep_tag: str) -> int:
-    """删除该软件除 keep_tag 外的所有历史 Release（源码 git 历史仍保留）。"""
+    """【v1 遗留，已停用】v2 永不覆盖，publish 不再调用；保留仅为兼容旧脚本。"""
     owner, repo = get_repo()
     count = 0
     for r in list_releases(token):
@@ -448,7 +448,7 @@ def list_releases(token: str, name: str | None = None) -> list[dict]:
         page += 1
     if name:
         out = [r for r in out
-               if r["tag_name"] == name + "-latest" or r["tag_name"].startswith(name + "-v")]
+               if r["tag_name"].startswith(name + "-")]
     return out
 
 
@@ -534,25 +534,28 @@ def publish(token: str, name: str, artifact: Path, bump: str = "patch",
     new_version = version or bump_version(current, bump)
     write_version(project, new_version)
 
-    tag = f"{name}-latest"
+    # v2 永不覆盖：每次 publish 都生成一个全局唯一 tag，历史 Release 全保留
+    stamp = _dt.datetime.now(_dt.timezone.utc).strftime("%Y%m%d-%H%M%S")
+    uniq = os.urandom(3).hex()
+    tag = f"{name}-v{new_version}-{stamp}-{uniq}"
     ascii_name = _ascii_name(name)
 
     commit_sha = sync_source(token, f"backup({name}): v{new_version} 源码与构建脚本")
 
-    release = upsert_release(
+    release = create_release(
         token, tag, f"{name} v{new_version}",
         f"## {name} v{new_version}\n\n"
         f"- 源码提交：`{commit_sha[:7]}`\n"
         f"- 生成时间：{_dt.datetime.now().isoformat(timespec='seconds')}\n"
-        f"- 只保留最新版每次更新会覆盖同一个 Release（{tag}），旧版本不保留。\n",
+        f"- **v2 永不覆盖**：本次是独立新 Release（{tag}），历史 Release / tag / 附件全部保留\n"
+        f"- 可用 `python scripts/omni.py download --tag {tag}` 单独取回\n",
     )
 
     # 1) 可执行文件：文件名用 ASCII，显示名用软件本名
     exe_file = f"{ascii_name}-{platform_label(artifact)}{artifact.suffix}"
     asset = upload_asset(token, release["upload_url"], artifact, name, exe_file)
 
-    # 清掉该软件的历史 Release，GitHub 上只看得到最新版
-    deleted = delete_old_releases(token, name, tag)
+    deleted = 0  # v2：永不删除任何历史 Release
 
     # 2) 源码压缩包：显示名「<软件本名>源码」
     source_label = f"{name}源码"
@@ -571,5 +574,6 @@ def publish(token: str, name: str, artifact: Path, bump: str = "patch",
         "asset": asset["name"], "asset_label": asset.get("label", name),
         "asset_url": asset["browser_download_url"], "size": asset["size"],
         "source_asset": src_asset["name"] if src_asset else None,
-        "deleted_old_releases": deleted,
+        "deleted_old_releases": deleted,  # v2 恒为 0
+        "history_preserved": True,
     }
