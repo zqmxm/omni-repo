@@ -40,8 +40,8 @@
       "artifact": "批量替换助手.exe",
       "runner": "windows-latest",
       "ascii_name": "piliangtihuanzhushou",
-      "skip_test": true
+      "manual_release": true
     }
   ],
-  "_说明_补充": "skip_test=true 的软件：CI 只做 go build 编译验证，不跑 go test（完整测试需 testdata/ 下的二进制样本，不入库）"
+  "_手动归档说明": "manual_release=true 的软件：源码入库、专属 workflow 出 Artifact，但不进 auto-backup 矩阵；成品 exe 由人工核对后挂固定 Release"
 }

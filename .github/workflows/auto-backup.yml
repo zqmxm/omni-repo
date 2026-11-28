@@ -36,7 +36,7 @@ jobs:
           python3 - <<'PY'
           import json, os
           manifest = json.load(open('build-manifest.json', encoding='utf-8'))
-          apps = manifest.get('apps', [])
+          apps = [a for a in manifest.get('apps', []) if not a.get('manual_release')]
           target = "${{ inputs.app }}".strip()
           if target:
               apps = [a for a in apps if a['name'] == target]
@@ -88,18 +88,10 @@ jobs:
           go-version: "1.21"
 
       - name: 自检 Go 软件
-        if: matrix.kind == 'go-exe' && matrix.skip_test != true
+        if: matrix.kind == 'go-exe'
         working-directory: ${{ matrix.dir }}
         shell: bash
         run: go test ./src -v
-
-      # 完整测试依赖 testdata/ 下的真实 .doc/.xls 二进制样本（不入库），
-      # 这类软件在 CI 里只验证「能编译」，避免无样本导致误报失败。
-      - name: 编译验证（跳过完整测试的软件）
-        if: matrix.kind == 'go-exe' && matrix.skip_test == true
-        working-directory: ${{ matrix.dir }}
-        shell: bash
-        run: go build ./src
 
       - name: 构建 Go Windows exe
         if: matrix.kind == 'go-exe'

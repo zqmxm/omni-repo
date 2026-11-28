@@ -87,9 +87,9 @@ CI 用 `actions/setup-go@v5` + `go test` + 上面的构建命令，参考 `.gith
 
 ### 批量替换助手（v3.1.1，接了自动构建）
 
-`desktop/批量替换助手/` 是 Go 写的批量替换工具，与上面两个手动归档不同：它**已接入** `build-manifest.json` 和 `.github/workflows/批量替换助手.yml`。
+`desktop/批量替换助手/` 是 Go 写的批量替换工具：**源码入库 + 专属 workflow 出 Artifact**，但和上面两个软件一样属于手动归档（`build-manifest.json` 里标了 `manual_release`），不进 `auto-backup.yml` 自动矩阵，固定 Release 由人工核对后更新。
 
 - 源码：`src/` + `internal/`，Go 1.21+，零第三方依赖
 - 本地出包：`build.bat`（GUI + CLI 两个 exe），或 `CROSS=1 bash build.sh`
-- CI：改 `desktop/批量替换助手/**` 自动做**编译验证**并出 GUI + CLI 两个 Artifact；`auto-backup.yml` 负责更新固定 Release。完整 `go test ./src -v` 依赖 `testdata/` 下 3 个真实 `.doc/.xls` 二进制样本（不入库），需本地补齐后手动跑
+- CI：改 `desktop/批量替换助手/**` 自动做**编译验证**并出 GUI + CLI 两个 Artifact（不自动改 Release）。完整 `go test ./src -v` 依赖 `testdata/` 下 3 个真实 `.doc/.xls` 二进制样本（不入库），需本地补齐后手动跑
 - 成品：Releases → `批量替换助手-latest`（GUI 版 + CLI 版两个附件）
