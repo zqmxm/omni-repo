@@ -91,5 +91,5 @@ CI 用 `actions/setup-go@v5` + `go test` + 上面的构建命令，参考 `.gith
 
 - 源码：`src/` + `internal/`，Go 1.21+，零第三方依赖
 - 本地出包：`build.bat`（GUI + CLI 两个 exe），或 `CROSS=1 bash build.sh`
-- CI：改 `desktop/批量替换助手/**` 自动跑 `go test ./src -v` 并出 Artifact；`auto-backup.yml` 负责更新固定 Release
+- CI：改 `desktop/批量替换助手/**` 自动做**编译验证**并出 GUI + CLI 两个 Artifact；`auto-backup.yml` 负责更新固定 Release。完整 `go test ./src -v` 依赖 `testdata/` 下 3 个真实 `.doc/.xls` 二进制样本（不入库），需本地补齐后手动跑
 - 成品：Releases → `批量替换助手-latest`（GUI 版 + CLI 版两个附件）

@@ -39,7 +39,9 @@
       "kind": "go-exe",
       "artifact": "批量替换助手.exe",
       "runner": "windows-latest",
-      "ascii_name": "piliangtihuanzhushou"
+      "ascii_name": "piliangtihuanzhushou",
+      "skip_test": true
     }
-  ]
+  ],
+  "_说明_补充": "skip_test=true 的软件：CI 只做 go build 编译验证，不跑 go test（完整测试需 testdata/ 下的二进制样本，不入库）"
 }
