@@ -141,36 +141,37 @@ jobs:
           echo "找到产物：$FILE"
           echo "path=$FILE" >> "$GITHUB_OUTPUT"
 
-      - name: 读取并递增版本
+      - name: 读取当前版本（不递增，避免与源码 appVersion 脱节）
         id: ver
         shell: bash
         run: |
           VF="${{ matrix.dir }}/VERSION"
           CUR=$(cat "$VF" 2>/dev/null || echo "0.0.0")
-          MAJOR=$(echo "$CUR" | cut -d. -f1)
-          MINOR=$(echo "$CUR" | cut -d. -f2)
-          PATCH=$(echo "$CUR" | cut -d. -f3)
-          NEXT="$MAJOR.$MINOR.$((PATCH+1))"
-          echo "$NEXT" > "$VF"
-          echo "version=$NEXT" >> "$GITHUB_OUTPUT"
-          # v2 永不覆盖：tag 全局唯一（软件名 + 版本 + UTC 时间 + run_id）
+          echo "version=$CUR" >> "$GITHUB_OUTPUT"
+          # v2 永不覆盖：tag 全局唯一（软件名 + 版本 + UTC 时间 + run_id），
+          # 唯一性由时间戳与 run_id 保证，不需要靠递增 VERSION 制造差异。
           STAMP=$(date -u +%Y%m%d-%H%M%S)
-          echo "tag=${{ matrix.name }}-v${NEXT}-${STAMP}-${GITHUB_RUN_ID}" >> "$GITHUB_OUTPUT"
+          echo "tag=${{ matrix.name }}-v${CUR}-${STAMP}-${GITHUB_RUN_ID}" >> "$GITHUB_OUTPUT"
 
-      - name: 统一资产文件名（GUI + 可选 CLI）
+      - name: 统一资产文件名（ASCII 名 + 中文 label）
         id: stable
         shell: bash
         run: |
-          EXT="${{ matrix.artifact }}"
-          EXT="${EXT##*.}"
-          ASSET="${{ matrix.name }}.$EXT"
+          # GitHub 上传接口会剥离中文 name（变成 default.exe），所以文件名用
+          # build-manifest.json 里的 ascii_name，中文软件本名放到 asset label。
+          EXT="${{ matrix.artifact }}"; EXT="${EXT##*.}"
+          BASE="${{ matrix.ascii_name }}"
+          if [ -z "$BASE" ]; then BASE="app"; fi
+          ASSET="${BASE}.${EXT}"
           cp "${{ steps.artifact.outputs.path }}" "$ASSET"
           echo "path=$ASSET" >> "$GITHUB_OUTPUT"
+          echo "gui_label=${{ matrix.name }}" >> "$GITHUB_OUTPUT"
           if [ -n "${{ matrix.cli_artifact }}" ]; then
             SRC=$(find "${{ matrix.dir }}" -type f -name "${{ matrix.cli_artifact }}" | head -1)
             if [ -n "$SRC" ]; then
-              cp "$SRC" "${{ matrix.cli_artifact }}"
-              echo "cli_path=${{ matrix.cli_artifact }}" >> "$GITHUB_OUTPUT"
+              cp "$SRC" "${BASE}-CLI.${EXT}"
+              echo "cli_path=${BASE}-CLI.${EXT}" >> "$GITHUB_OUTPUT"
+              echo "cli_label=${{ matrix.name }} 命令行版" >> "$GITHUB_OUTPUT"
             fi
           fi
 
@@ -191,25 +192,28 @@ jobs:
           files: |
             ${{ steps.stable.outputs.path }}
             ${{ steps.stable.outputs.cli_path }}
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 提交版本号更新（API 写入，避免 git 并行 push 竞争）
+      - name: 给附件挂中文显示名（label）
         uses: actions/github-script@v7
         with:
           script: |
-            const path = '${{ matrix.dir }}/VERSION';
-            const ver = '${{ steps.ver.outputs.version }}';
-            let sha;
+            const tag = '${{ steps.ver.outputs.tag }}';
+            const gui = '${{ steps.stable.outputs.gui_label }}';
+            const cli = '${{ steps.stable.outputs.cli_label }}';
+            let rel;
             try {
-              const cur = await github.rest.repos.getContent({
-                owner: context.repo.owner, repo: context.repo.repo, path,
+              rel = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner, repo: context.repo.repo, tag,
               });
-              sha = cur.data.sha;
-            } catch (e) { sha = undefined; }
-            await github.rest.repos.createOrUpdateFileContents({
-              owner: context.repo.owner, repo: context.repo.repo, path,
-              message: `chore(${{ matrix.name }}): 版本更新至 v${ver}`,
-              content: Buffer.from(ver + '\n').toString('base64'),
-              sha,
-            });
+            } catch (e) { return; }
+            for (const a of rel.data.assets) {
+              const label = a.name.includes('-CLI') ? (cli || gui) : gui;
+              if (!label) continue;
+              await github.rest.repos.updateReleaseAsset({
+                owner: context.repo.owner, repo: context.repo.repo,
+                asset_id: a.id, name: a.name, label,
+              });
+            }
