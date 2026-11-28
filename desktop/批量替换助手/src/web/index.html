@@ -1,0 +1,173 @@
+
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>批量替换助手</title>
+<style>
+:root{--bg:#0c0e14;--card:#151925;--line:#262c3a;--txt:#e8ebf2;--dim:#9aa3b5;--muted:#697186;--acc:#7c5cff;--acc2:#28d0c0;--ok:#35d29b;--err:#ff6b7a;--warn:#ffc857}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:radial-gradient(1200px 600px at 15% -10%,#1b1740 0%,transparent 55%),radial-gradient(900px 500px at 100% 0%,#0d2b33 0%,transparent 50%),var(--bg);color:var(--txt);font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif;min-height:100vh}
+.wrap{max-width:920px;margin:0 auto;padding:28px 24px 60px}
+header{display:flex;align-items:center;gap:14px;margin-bottom:8px}
+.logo{width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,var(--acc),var(--acc2));display:grid;place-items:center;font-size:23px;font-weight:800}
+h1{font-size:22px;letter-spacing:.5px}
+header p{color:var(--dim);font-size:12.5px}
+.topbar{display:flex;justify-content:flex-end;margin-top:-38px;margin-bottom:6px}
+.topbar button{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer}
+.topbar button:hover{border-color:var(--err);color:var(--err)}
+.card{background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.01));border:1px solid var(--line);border-radius:16px;padding:22px;margin-top:20px}
+.card h3{font-size:15px;margin-bottom:16px;display:flex;align-items:center;gap:8px;color:var(--txt)}
+.card h3 span{color:var(--acc);font-size:12px}
+label{display:block;font-size:12.5px;color:var(--dim);margin:12px 0 6px}
+input[type=text]{width:100%;background:#0e1119;border:1px solid var(--line);border-radius:9px;padding:10px 12px;color:var(--txt);font-size:14px;outline:none}
+input[type=text]:focus{border-color:var(--acc)}
+.row{display:flex;gap:10px;align-items:center}
+.row input{flex:1}
+.btn{background:var(--acc);border:0;color:#fff;border-radius:9px;padding:10px 18px;font-size:13.5px;font-weight:600;cursor:pointer;transition:.2s;white-space:nowrap}
+.btn:hover{filter:brightness(1.15)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--dim)}
+.btn.ghost:hover{border-color:var(--acc);color:var(--txt)}
+.pair{display:flex;gap:10px;align-items:center;margin-bottom:10px}
+.pair input{flex:1}
+.pair .del{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:8px;width:34px;height:36px;cursor:pointer;font-size:16px}
+.pair .del:hover{border-color:var(--err);color:var(--err)}
+.pair .arrow{color:var(--acc2);font-weight:700}
+.opts{display:flex;flex-wrap:wrap;gap:18px;margin-top:14px}
+.opts label{display:flex;align-items:center;gap:7px;margin:0;color:var(--dim);cursor:pointer}
+.opts input{accent-color:var(--acc);width:16px;height:16px}
+.warn{background:rgba(255,200,87,.08);border:1px solid rgba(255,200,87,.3);color:var(--warn);border-radius:9px;padding:9px 12px;font-size:12.5px;margin-top:14px}
+.runbar{display:flex;align-items:center;gap:14px;margin-top:20px}
+.runbar .btn{padding:12px 30px;font-size:15px;background:linear-gradient(135deg,var(--acc),#5b3fd6)}
+#log{background:#0a0d14;border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:18px;height:290px;overflow:auto;font:12.5px/1.8 Consolas,"Microsoft YaHei",monospace}
+.ln{padding:2px 0;border-bottom:1px solid rgba(255,255,255,.03)}
+.ln.ok{color:var(--ok)}.ln.err{color:var(--err)}.ln.skip{color:var(--muted)}.ln.info{color:var(--dim)}
+.badge{display:inline-block;padding:0 7px;border-radius:5px;font-size:11px;margin-right:8px;background:rgba(124,92,255,.2);color:#b8a6ff}
+.foot{color:var(--muted);font-size:11.5px;text-align:center;margin-top:24px;line-height:1.9}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">替</div>
+    <div><h1>批量替换助手</h1><p>批量替换 Word / Excel 内容与文件名 · 本地运行，不联网</p></div>
+  </header>
+  <div class="topbar"><button id="quitBtn">退出程序</button></div>
+
+  <div class="card">
+    <h3>① 选择文件夹 <span>要处理的 Word / Excel 文件都放在这里</span></h3>
+    <label>文件夹路径</label>
+    <div class="row">
+      <input type="text" id="dir" placeholder="点右侧「浏览…」选择，或直接粘贴完整路径">
+      <button class="btn ghost" id="pickBtn">浏览…</button>
+    </div>
+    <div class="opts">
+      <label><input type="checkbox" id="recursive" checked> 包含子文件夹</label>
+      <label><input type="checkbox" id="content" checked> 替换文档内容</label>
+      <label><input type="checkbox" id="rename"> 同时替换文件名</label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>② 替换规则 <span>「替换为」留空则该组不生效；可添加多组</span></h3>
+    <div id="pairs"></div>
+    <button class="btn ghost" id="addBtn">+ 添加一组规则</button>
+    <div class="warn">⚠️ 替换后无法撤销。程序会自动保留 .nf-bak 备份以防写入失败，重要文件仍建议先自行复制留底。</div>
+  </div>
+
+  <div class="card">
+    <h3>③ 开始执行</h3>
+    <div class="runbar">
+      <button class="btn" id="runBtn">开始替换</button>
+      <span id="status" style="color:var(--dim);font-size:12.5px"></span>
+    </div>
+    <div id="log"><div class="ln info">准备就绪，选好文件夹、填好替换内容后点「开始替换」。</div></div>
+  </div>
+
+  <div class="foot">
+    支持 .docx / .xlsx / .docm / .dotx / .xlsx / .xlsm / .xltx / .xltm / .doc / .xls（含宏文档）<br>
+    纯本地解析，<b>无需安装 Office 或 WPS</b>，也不需要联网。旧版 .doc 会重写正文，字符级局部格式可能被统一。
+  </div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const S={running:false};
+function addPair(from='',to=''){
+  const d=document.createElement('div'); d.className='pair';
+  d.innerHTML='<input type="text" class="pf" placeholder="原内容">'+
+    '<span class="arrow">→</span>'+
+    '<input type="text" class="pt" placeholder="替换为（留空则不替换）">'+
+    '<button class="del" title="删除这组">×</button>';
+  d.querySelector('.pf').value=from; d.querySelector('.pt').value=to;
+  d.querySelector('.del').onclick=()=>{if(document.querySelectorAll('.pair').length>1)d.remove()};
+  $('pairs').appendChild(d);
+}
+// 打开软件就预置 5 条原始内容：AAAA BBBB CCCC DDDD EEEE
+['AAAA','BBBB','CCCC','DDDD','EEEE'].forEach(v=>addPair(v,''));
+$('addBtn').onclick=()=>addPair();
+
+// 「浏览…」调用 exe 内置的原生命件夹选择对话框
+$('pickBtn').onclick=async()=>{
+  const b=$('pickBtn'); b.disabled=true; b.textContent='选择中…';
+  try{
+    const r=await fetch('/api/pickfolder');
+    const j=await r.json();
+    if(j.error){ $('status').textContent=j.error; }
+    else if(j.path){ $('dir').value=j.path; $('status').textContent='已选择文件夹'; }
+  }catch(e){ $('status').textContent='无法打开选择窗口，请直接粘贴文件夹路径'; }
+  b.disabled=false; b.textContent='浏览…';
+};
+
+// 退出程序
+$('quitBtn').onclick=async()=>{
+  if(!confirm('确定要退出批量替换助手吗？'))return;
+  try{ await fetch('/api/quit'); }catch(e){}
+  $('status').textContent='程序已退出，可以关闭本页面了';
+  setTimeout(()=>window.close(),300);
+};
+
+function log(cls,html){
+  const d=document.createElement('div'); d.className='ln '+cls; d.innerHTML=html;
+  $('log').appendChild(d); $('log').scrollTop=$('log').scrollHeight;
+}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+const ev=new EventSource('/api/events');
+ev.onmessage=e=>{
+  const m=JSON.parse(e.data);
+  if(m.type==='log')log('info',esc(m.message));
+  else if(m.type==='item'){
+    const it=m.item, cls=it.status==='ok'?'ok':it.status==='failed'?'err':'skip';
+    const tag={docx:'Word',xlsx:'Excel','legacy-doc':'旧版Word','legacy-xls':'旧版Excel',rename:'改名',error:'错误'}[it.kind]||it.kind;
+    let msg=esc(it.path||'');
+    if(it.fromName)msg+=' → '+esc(it.toName);
+    if(it.message)msg+='　'+esc(it.message);
+    log(cls,'<span class="badge">'+tag+'</span>'+msg);
+  }else if(m.type==='done'){
+    log(m.failed>0?'err':'ok','✅ '+esc(m.message));
+    S.running=false;$('runBtn').disabled=false;$('runBtn').textContent='开始替换';
+    $('status').textContent='执行结束';
+  }
+};
+ev.onerror=()=>{$('status').textContent='日志连接断开，刷新页面可恢复'};
+$('runBtn').onclick=async()=>{
+  const pairs=[...document.querySelectorAll('.pair')].map(d=>({from:d.querySelector('.pf').value.trim(),to:d.querySelector('.pt').value.trim()})).filter(p=>p.from&&p.to);
+  const body={dir:$('dir').value.trim(),pairs,recursive:$('recursive').checked,
+    replaceContent:$('content').checked,renameFiles:$('rename').checked};
+  if(!body.dir){alert('请先选择或填写文件夹路径');return}
+  if(!pairs.length){alert('请至少填写一组有效的替换规则（原内容和替换为都要填）');return}
+  if(!body.replaceContent&&!body.renameFiles){alert('请至少勾选「替换文档内容」或「同时替换文件名」');return}
+  $('log').innerHTML=''; S.running=true; $('runBtn').disabled=true; $('runBtn').textContent='替换中…';
+  $('status').textContent='正在执行，请看下方日志…';
+  log('info','▶ 任务已提交，共 '+pairs.length+' 组规则');
+  try{
+    const r=await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const j=await r.json();
+    if(j.error){log('err','✗ '+esc(j.error));S.running=false;$('runBtn').disabled=false;$('runBtn').textContent='开始替换'}
+  }catch(e){log('err','请求失败：'+esc(e.message));S.running=false;$('runBtn').disabled=false;$('runBtn').textContent='开始替换'}
+};
+</script>
+</body>
+</html>

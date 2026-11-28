@@ -32,6 +32,14 @@
       "artifact": "自动操作助手.exe",
       "runner": "windows-latest",
       "ascii_name": "zidongcaozuozhushou"
+    },
+    {
+      "name": "批量替换助手",
+      "dir": "desktop/批量替换助手",
+      "kind": "go-exe",
+      "artifact": "批量替换助手.exe",
+      "runner": "windows-latest",
+      "ascii_name": "piliangtihuanzhushou"
     }
   ]
 }

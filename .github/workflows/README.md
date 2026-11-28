@@ -14,6 +14,7 @@
 | `auto-backup.yml` | 读 `build-manifest.json` 清单，自动打包软件并更新 GitHub Releases 固定版（只保留最新版） |
 | `透明橡皮擦.yml` | 专门负责把「透明橡皮擦」打包成 Windows exe |
 | `自动操作助手.yml` | 专门负责自检并把「自动操作助手」打包成 `自动操作助手.exe` |
+| `批量替换助手.yml` | 专门负责自检并把「批量替换助手」打包成 GUI + CLI 两个 exe |
 | `README.md` | 就是这份说明 |
 
 ## 生成的文件在哪里

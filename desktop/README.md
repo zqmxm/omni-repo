@@ -84,3 +84,12 @@ CI 用 `actions/setup-go@v5` + `go test` + 上面的构建命令，参考 `.gith
 这两个都是**已经产出成品的归档**：源码在本目录，exe 只在 Release（仓库不收二进制）。成品含内置中文 OCR 模型 / 纯本地文件操作，CI 无法重建，所以没接 `build-manifest.json` 自动构建，也没加 workflow，后续更新直接覆盖固定 Release。
 
 两个目录里都有 `README.md`（怎么用、每个文件是什么）、`VERSION`、`CHECKSUMS.md`（成品校验值）。「夸克扫描王批量处理/历史版本/」放的是已作废的中间版源码，只备查，不要拿去编译。
+
+### 批量替换助手（v3.1.1，接了自动构建）
+
+`desktop/批量替换助手/` 是 Go 写的批量替换工具，与上面两个手动归档不同：它**已接入** `build-manifest.json` 和 `.github/workflows/批量替换助手.yml`。
+
+- 源码：`src/` + `internal/`，Go 1.21+，零第三方依赖
+- 本地出包：`build.bat`（GUI + CLI 两个 exe），或 `CROSS=1 bash build.sh`
+- CI：改 `desktop/批量替换助手/**` 自动跑 `go test ./src -v` 并出 Artifact；`auto-backup.yml` 负责更新固定 Release
+- 成品：Releases → `批量替换助手-latest`（GUI 版 + CLI 版两个附件）
